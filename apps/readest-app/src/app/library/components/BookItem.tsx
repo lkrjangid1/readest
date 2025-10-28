@@ -126,7 +126,7 @@ const BookItem: React.FC<BookItemProps> = ({
                 </div>
               </button>
             )}
-            {transferProgress !== null ? (
+            {/* {transferProgress !== null ? (
               transferProgress === 100 ? null : (
                 <div
                   className='radial-progress'
@@ -163,7 +163,7 @@ const BookItem: React.FC<BookItemProps> = ({
                   )}
                 </button>
               )
-            )}
+            )} */}
           </div>
         </div>
       </div>
