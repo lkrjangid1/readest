@@ -39,7 +39,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
   const router = useRouter();
   const { envConfig, appService } = useEnv();
   const { user } = useAuth();
-  const { userPlan, quotas } = useQuotaStats(true);
+  // const { userPlan, quotas } = useQuotaStats(true);
   const { themeMode, setThemeMode } = useThemeStore();
   const { settings, setSettingsDialogOpen } = useSettingsStore();
   const [isAutoUpload, setIsAutoUpload] = useState(settings.autoUpload);
@@ -203,7 +203,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
         'z-20 mt-2 max-w-[90vw] shadow-2xl',
       )}
     >
-      {user ? (
+      {/* {user ? (
         <MenuItem
           label={
             userDisplayName
@@ -234,7 +234,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
         label={_('Auto Upload Books to Cloud')}
         toggled={isAutoUpload}
         onClick={toggleAutoUploadBooks}
-      />
+      /> */}
       {isTauriAppPlatform() && !appService?.isMobile && (
         <MenuItem
           label={_('Auto Import on File Open')}
@@ -256,7 +256,7 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
           onClick={toggleAutoCheckUpdates}
         />
       )}
-      <hr aria-hidden='true' className='border-base-200 my-1' />
+      {/* <hr aria-hidden='true' className='border-base-200 my-1' /> */}
       {appService?.hasWindow && (
         <MenuItem
           label={_('Open Book in New Window')}
@@ -304,18 +304,18 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
           </MenuItem>
         </>
       )}
-      <hr aria-hidden='true' className='border-base-200 my-1' />
-      {user && userPlan === 'free' && !appService?.isIOSApp && (
+      {/* <hr aria-hidden='true' className='border-base-200 my-1' /> */}
+      {/* {user && userPlan === 'free' && !appService?.isIOSApp && (
         <MenuItem label={_('Upgrade to Readest Premium')} onClick={handleUpgrade} />
-      )}
-      {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />}
-      <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
-      <MenuItem
+      )} */}
+      {/* {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />} */}
+      {/* <MenuItem label={_('About Readest')} onClick={showAboutReadest} /> */}
+      {/* <MenuItem
         label={_('Help improve Readest')}
         description={isTelemetryEnabled ? _('Sharing anonymized statistics') : ''}
         toggled={isTelemetryEnabled}
         onClick={toggleTelemetry}
-      />
+      /> */}
     </Menu>
   );
 };

@@ -261,7 +261,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
       />
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
-
+{/* 
       <MenuItem
         label={
           !user
@@ -275,7 +275,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
         Icon={user ? MdSync : MdSyncProblem}
         iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
         onClick={handleSync}
-      />
+      /> */}
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
