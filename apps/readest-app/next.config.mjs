@@ -22,6 +22,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  exports:{
+    distDir:'build'
+  },
   devIndicators: false,
   // Configure assetPrefix or else the server won't properly resolve your assets.
   assetPrefix: '',

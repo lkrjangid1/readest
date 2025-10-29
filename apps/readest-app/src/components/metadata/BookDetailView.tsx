@@ -1,8 +1,8 @@
 import clsx from 'clsx';
 import React from 'react';
 import {
-  MdOutlineCloudDownload,
-  MdOutlineCloudUpload,
+  // MdOutlineCloudDownload,
+  // MdOutlineCloudUpload,
   MdOutlineDelete,
   MdOutlineEdit,
 } from 'react-icons/md';
@@ -42,8 +42,8 @@ const BookDetailView: React.FC<BookDetailViewProps> = ({
   onDelete,
   onDeleteCloudBackup,
   onDeleteLocalCopy,
-  onDownload,
-  onUpload,
+  // onDownload,
+  // onUpload,
 }) => {
   const _ = useTranslation();
 

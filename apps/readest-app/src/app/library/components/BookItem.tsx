@@ -1,19 +1,19 @@
 import clsx from 'clsx';
 import { MdCheckCircle, MdCheckCircleOutline } from 'react-icons/md';
 import {
-  LiaCloudUploadAltSolid,
-  LiaCloudDownloadAltSolid,
+  // LiaCloudUploadAltSolid,
+  // LiaCloudDownloadAltSolid,
   LiaInfoCircleSolid,
 } from 'react-icons/lia';
 
 import { Book } from '@/types/book';
 import { useEnv } from '@/context/EnvContext';
-import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+// import { useAuth } from '@/context/AuthContext';
+// import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { LibraryCoverFitType, LibraryViewModeType } from '@/types/settings';
-import { navigateToLogin } from '@/utils/nav';
+// import { navigateToLogin } from '@/utils/nav';
 import { formatAuthors } from '@/utils/book';
 import ReadingProgress from './ReadingProgress';
 import BookCover from '@/components/BookCover';
@@ -36,14 +36,14 @@ const BookItem: React.FC<BookItemProps> = ({
   coverFit,
   isSelectMode,
   bookSelected,
-  transferProgress,
-  handleBookUpload,
-  handleBookDownload,
+  // transferProgress,
+  // handleBookUpload,
+  // handleBookDownload,
   showBookDetailsModal,
 }) => {
   const _ = useTranslation();
-  const router = useRouter();
-  const { user } = useAuth();
+  // const router = useRouter();
+  // const { user } = useAuth();
   const { appService } = useEnv();
   const iconSize15 = useResponsiveSize(15);
 

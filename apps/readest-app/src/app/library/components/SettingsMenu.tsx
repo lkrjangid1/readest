@@ -1,29 +1,29 @@
 import clsx from 'clsx';
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { PiUserCircle, PiUserCircleCheck, PiGear } from 'react-icons/pi';
+// import { useRouter } from 'next/navigation';
+import { PiGear } from 'react-icons/pi';
 import { PiSun, PiMoon } from 'react-icons/pi';
 import { TbSunMoon } from 'react-icons/tb';
 
 import { invoke, PermissionState } from '@tauri-apps/api/core';
-import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { DOWNLOAD_READEST_URL } from '@/services/constants';
-import { useAuth } from '@/context/AuthContext';
+import { isTauriAppPlatform } from '@/services/environment';
+// import { DOWNLOAD_READEST_URL } from '@/services/constants';
+// import { useAuth } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
-import { useQuotaStats } from '@/hooks/useQuotaStats';
+// import { useQuotaStats } from '@/hooks/useQuotaStats';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useResponsiveSize } from '@/hooks/useResponsiveSize';
-import { navigateToLogin, navigateToProfile } from '@/utils/nav';
+// import { useResponsiveSize } from '@/hooks/useResponsiveSize';
+// import { navigateToLogin, navigateToProfile } from '@/utils/nav';
 import { tauriHandleSetAlwaysOnTop, tauriHandleToggleFullScreen } from '@/utils/window';
-import { optInTelemetry, optOutTelemetry } from '@/utils/telemetry';
-import { setAboutDialogVisible } from '@/components/AboutWindow';
+// import { optInTelemetry, optOutTelemetry } from '@/utils/telemetry';
+// import { setAboutDialogVisible } from '@/components/AboutWindow';
 import { setMigrateDataDirDialogVisible } from '@/app/library/components/MigrateDataWindow';
 import { saveSysSettings } from '@/helpers/settings';
-import UserAvatar from '@/components/UserAvatar';
+// import UserAvatar from '@/components/UserAvatar';
 import MenuItem from '@/components/MenuItem';
-import Quota from '@/components/Quota';
+// import Quota from '@/components/Quota';
 import Menu from '@/components/Menu';
 
 interface SettingsMenuProps {
@@ -36,13 +36,13 @@ interface Permissions {
 
 const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
   const _ = useTranslation();
-  const router = useRouter();
+  // const router = useRouter();
   const { envConfig, appService } = useEnv();
-  const { user } = useAuth();
+  // const { user } = useAuth();
   // const { userPlan, quotas } = useQuotaStats(true);
   const { themeMode, setThemeMode } = useThemeStore();
   const { settings, setSettingsDialogOpen } = useSettingsStore();
-  const [isAutoUpload, setIsAutoUpload] = useState(settings.autoUpload);
+  // const [isAutoUpload, setIsAutoUpload] = useState(settings.autoUpload);
   const [isAutoCheckUpdates, setIsAutoCheckUpdates] = useState(settings.autoCheckUpdates);
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(settings.alwaysOnTop);
   const [isAlwaysShowStatusBar, setIsAlwaysShowStatusBar] = useState(settings.alwaysShowStatusBar);
@@ -51,29 +51,29 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
   const [isAutoImportBooksOnOpen, setIsAutoImportBooksOnOpen] = useState(
     settings.autoImportBooksOnOpen,
   );
-  const [isTelemetryEnabled, setIsTelemetryEnabled] = useState(settings.telemetryEnabled);
+  // const [isTelemetryEnabled, setIsTelemetryEnabled] = useState(settings.telemetryEnabled);
   const [alwaysInForeground, setAlwaysInForeground] = useState(settings.alwaysInForeground);
-  const iconSize = useResponsiveSize(16);
+  // const iconSize = useResponsiveSize(16);
 
-  const showAboutReadest = () => {
-    setAboutDialogVisible(true);
-    setIsDropdownOpen?.(false);
-  };
+  // const showAboutReadest = () => {
+  //   setAboutDialogVisible(true);
+  //   setIsDropdownOpen?.(false);
+  // };
 
-  const downloadReadest = () => {
-    window.open(DOWNLOAD_READEST_URL, '_blank');
-    setIsDropdownOpen?.(false);
-  };
+  // const downloadReadest = () => {
+  //   window.open(DOWNLOAD_READEST_URL, '_blank');
+  //   setIsDropdownOpen?.(false);
+  // };
 
-  const handleUserLogin = () => {
-    navigateToLogin(router);
-    setIsDropdownOpen?.(false);
-  };
+  // const handleUserLogin = () => {
+  //   navigateToLogin(router);
+  //   setIsDropdownOpen?.(false);
+  // };
 
-  const handleUserProfile = () => {
-    navigateToProfile(router);
-    setIsDropdownOpen?.(false);
-  };
+  // const handleUserProfile = () => {
+  //   navigateToProfile(router);
+  //   setIsDropdownOpen?.(false);
+  // };
 
   const cycleThemeMode = () => {
     const nextMode = themeMode === 'auto' ? 'light' : themeMode === 'light' ? 'dark' : 'auto';
@@ -109,15 +109,15 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
     setIsAlwaysShowStatusBar(newValue);
   };
 
-  const toggleAutoUploadBooks = () => {
-    const newValue = !settings.autoUpload;
-    saveSysSettings(envConfig, 'autoUpload', newValue);
-    setIsAutoUpload(newValue);
+  // const toggleAutoUploadBooks = () => {
+  //   const newValue = !settings.autoUpload;
+  //   saveSysSettings(envConfig, 'autoUpload', newValue);
+  //   setIsAutoUpload(newValue);
 
-    if (newValue && !user) {
-      navigateToLogin(router);
-    }
-  };
+  //   if (newValue && !user) {
+  //     navigateToLogin(router);
+  //   }
+  // };
 
   const toggleAutoImportBooksOnOpen = () => {
     const newValue = !settings.autoImportBooksOnOpen;
@@ -143,21 +143,21 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
     setIsOpenLastBooks(newValue);
   };
 
-  const toggleTelemetry = () => {
-    const newValue = !settings.telemetryEnabled;
-    saveSysSettings(envConfig, 'telemetryEnabled', newValue);
-    setIsTelemetryEnabled(newValue);
-    if (newValue) {
-      optInTelemetry();
-    } else {
-      optOutTelemetry();
-    }
-  };
+  // const toggleTelemetry = () => {
+  //   const newValue = !settings.telemetryEnabled;
+  //   saveSysSettings(envConfig, 'telemetryEnabled', newValue);
+  //   setIsTelemetryEnabled(newValue);
+  //   if (newValue) {
+  //     optInTelemetry();
+  //   } else {
+  //     optOutTelemetry();
+  //   }
+  // };
 
-  const handleUpgrade = () => {
-    navigateToProfile(router);
-    setIsDropdownOpen?.(false);
-  };
+  // const handleUpgrade = () => {
+  //   navigateToProfile(router);
+  //   setIsDropdownOpen?.(false);
+  // };
 
   const handleSetRootDir = () => {
     setMigrateDataDirDialogVisible(true);
@@ -186,9 +186,9 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
     setAlwaysInForeground(requestAlwaysInForeground);
   };
 
-  const avatarUrl = user?.user_metadata?.['picture'] || user?.user_metadata?.['avatar_url'];
-  const userFullName = user?.user_metadata?.['full_name'];
-  const userDisplayName = userFullName ? userFullName.split(' ')[0] : null;
+  // const avatarUrl = user?.user_metadata?.['picture'] || user?.user_metadata?.['avatar_url'];
+  // const userFullName = user?.user_metadata?.['full_name'];
+  // const userDisplayName = userFullName ? userFullName.split(' ')[0] : null;
   const themeModeLabel =
     themeMode === 'dark'
       ? _('Dark Mode')
