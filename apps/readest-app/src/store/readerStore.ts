@@ -136,41 +136,87 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       const { settings } = useSettingsStore.getState();
       if (!bookData) {
         const appService = await envConfig.getAppService();
-        const { library } = useLibraryStore.getState();
-        const book = library.find((b) => b.hash === id);
-        if (!book) {
-          throw new Error('Book not found');
-        }
-        const content = (await appService.loadBookContent(book, settings)) as BookContent;
-        const { file, config } = content;
-        console.log('Loading book', key);
-        const { book: bookDoc } = await new DocumentLoader(file).open();
-        updateToc(bookDoc, config.viewSettings?.sortedTOC ?? false);
-        if (!bookDoc.metadata.title) {
-          bookDoc.metadata.title = getBaseFilename(file.name);
-        }
-        book.sourceTitle = formatTitle(bookDoc.metadata.title);
-        // Correct language codes mistakenly set with language names
-        if (typeof bookDoc.metadata?.language === 'string') {
-          if (bookDoc.metadata.language in SUPPORTED_LANGNAMES) {
-            bookDoc.metadata.language = SUPPORTED_LANGNAMES[bookDoc.metadata.language]!;
-          }
-        }
-        // Set the book's language for formerly imported books, newly imported books have this field set
-        const primaryLanguage = getPrimaryLanguage(bookDoc.metadata.language);
-        book.primaryLanguage = book.primaryLanguage ?? primaryLanguage;
-        book.metadata = book.metadata ?? bookDoc.metadata;
-        // TODO: uncomment this when we can ensure metaHash is correctly generated for all books
-        // book.metaHash = book.metaHash ?? getMetadataHash(bookDoc.metadata);
-        book.metaHash = getMetadataHash(bookDoc.metadata);
 
-        const isFixedLayout = FIXED_LAYOUT_FORMATS.has(book.format);
-        useBookDataStore.setState((state) => ({
-          booksData: {
-            ...state.booksData,
-            [id]: { id, book, file, config, bookDoc, isFixedLayout },
-          },
-        }));
+        // Check if this is Flutter mode with pre-loaded book data
+        const flutterBookData = (window as any).__FLUTTER_BOOK_DATA__;
+        if (flutterBookData && flutterBookData.book && flutterBookData.book.hash === id) {
+          const book = flutterBookData.book;
+          const content = {
+            book,
+            file: book.file,
+            config: {
+              updatedAt: Date.now(),
+              progress: book.progress || [1, 1],
+              location: '',
+              viewSettings: {},
+              booknotes: []
+            }
+          } as BookContent;
+
+          const { file, config } = content;
+          console.log('Loading Flutter book', key);
+          const { book: bookDoc } = await new DocumentLoader(file).open();
+          updateToc(bookDoc, config.viewSettings?.sortedTOC ?? false);
+          if (!bookDoc.metadata.title) {
+            bookDoc.metadata.title = getBaseFilename(file.name);
+          }
+          book.sourceTitle = formatTitle(bookDoc.metadata.title);
+
+          const isFixedLayout = FIXED_LAYOUT_FORMATS.has(book.format);
+          useBookDataStore.setState((state) => ({
+            booksData: {
+              ...state.booksData,
+              [id]: { id, book, file, config, bookDoc, isFixedLayout },
+            },
+          }));
+        } else {
+          // Original book loading logic
+          let { library } = useLibraryStore.getState();
+          let book = library.find((b) => b.hash === id);
+
+          // If book not found in current library, try refreshing from file system
+          if (!book) {
+            console.log('Book not found in current library, refreshing...');
+            library = await appService.loadLibraryBooks();
+            useLibraryStore.getState().setLibrary(library);
+            book = library.find((b) => b.hash === id);
+
+            if (!book) {
+              throw new Error('Book not found');
+            }
+            console.log('Book found after library refresh:', book.title);
+          }
+          const content = (await appService.loadBookContent(book, settings)) as BookContent;
+          const { file, config } = content;
+          console.log('Loading book', key);
+          const { book: bookDoc } = await new DocumentLoader(file).open();
+          updateToc(bookDoc, config.viewSettings?.sortedTOC ?? false);
+          if (!bookDoc.metadata.title) {
+            bookDoc.metadata.title = getBaseFilename(file.name);
+          }
+          book.sourceTitle = formatTitle(bookDoc.metadata.title);
+          // Correct language codes mistakenly set with language names
+          if (typeof bookDoc.metadata?.language === 'string') {
+            if (bookDoc.metadata.language in SUPPORTED_LANGNAMES) {
+              bookDoc.metadata.language = SUPPORTED_LANGNAMES[bookDoc.metadata.language]!;
+            }
+          }
+          // Set the book's language for formerly imported books, newly imported books have this field set
+          const primaryLanguage = getPrimaryLanguage(bookDoc.metadata.language);
+          book.primaryLanguage = book.primaryLanguage ?? primaryLanguage;
+          book.metadata = book.metadata ?? bookDoc.metadata;
+          // TODO: uncomment this when we can ensure metaHash is correctly generated for all books
+          // book.metaHash = book.metaHash ?? getMetadataHash(bookDoc.metadata);
+          book.metaHash = getMetadataHash(bookDoc.metadata);
+
+          const isFixedLayout = FIXED_LAYOUT_FORMATS.has(book.format);
+          useBookDataStore.setState((state) => ({
+            booksData: {
+              ...state.booksData,
+              [id]: { id, book, file, config, bookDoc, isFixedLayout },
+            },
+          }));
+        }
       }
       const booksData = useBookDataStore.getState().booksData;
       const config = booksData[id]?.config as BookConfig;

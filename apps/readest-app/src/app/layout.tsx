@@ -67,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name='twitter:title' content={title} />
         <meta name='twitter:description' content={description} />
         <meta name='twitter:image' content={previewImage} />
+        <script src='/flutter-reader-integration.js' defer />
       </head>
       <body>
         <EnvProvider>

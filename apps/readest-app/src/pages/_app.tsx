@@ -25,6 +25,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <meta name='mobile-web-app-capable' content='yes' />
         <meta name='theme-color' content='white' />
         <link rel='manifest' href='/manifest.json' />
+        <script src='/flutter-reader-integration.js' defer />
       </Head>
       <EnvProvider>
         <Providers>
