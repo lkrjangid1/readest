@@ -2,8 +2,8 @@ import clsx from 'clsx';
 import React, { useEffect } from 'react';
 import { useState } from 'react';
 // import { useRouter } from 'next/navigation';
-import { BiMoon, BiSun } from 'react-icons/bi';
-import { TbSunMoon } from 'react-icons/tb';
+// import { BiMoon, BiSun } from 'react-icons/bi';
+// import { TbSunMoon } from 'react-icons/tb';
 import { MdZoomOut, MdZoomIn, MdCheck } from 'react-icons/md';
 // import { MdSync, MdSyncProblem } from 'react-icons/md';
 import { IoMdExpand } from 'react-icons/io';
@@ -23,7 +23,7 @@ import { getStyles } from '@/utils/style';
 // import { eventDispatcher } from '@/utils/event';
 import { getMaxInlineSize } from '@/utils/config';
 import { saveViewSettings } from '@/helpers/settings';
-import { tauriHandleToggleFullScreen } from '@/utils/window';
+// import { tauriHandleToggleFullScreen } from '@/utils/window';
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
 
@@ -36,7 +36,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
   const _ = useTranslation();
   // const router = useRouter();
   // const { user } = useAuth();
-  const { envConfig, appService } = useEnv();
+  const { envConfig } = useEnv();
   const { getBookData } = useBookDataStore();
   const { setSettingsDialogOpen } = useSettingsStore();
   const { getView, getViewSettings, setViewSettings } = useReaderStore();
@@ -45,7 +45,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
   const viewSettings = getViewSettings(bookKey)!;
   // const viewState = getViewState(bookKey);
 
-  const { themeMode, isDarkMode, setThemeMode } = useThemeStore();
+  const {isDarkMode } = useThemeStore();
   const [isScrolledMode, setScrolledMode] = useState(viewSettings!.scrolled);
   const [zoomLevel, setZoomLevel] = useState(viewSettings!.zoomLevel!);
   const [zoomMode, setZoomMode] = useState(viewSettings!.zoomMode!);
@@ -65,15 +65,15 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
     setSettingsDialogOpen(true);
   };
 
-  const cycleThemeMode = () => {
-    const nextMode = themeMode === 'auto' ? 'light' : themeMode === 'light' ? 'dark' : 'auto';
-    setThemeMode(nextMode);
-  };
+  // const cycleThemeMode = () => {
+  //   const nextMode = themeMode === 'auto' ? 'light' : themeMode === 'light' ? 'dark' : 'auto';
+  //   setThemeMode(nextMode);
+  // };
 
-  const handleFullScreen = () => {
-    tauriHandleToggleFullScreen();
-    setIsDropdownOpen?.(false);
-  };
+  // const handleFullScreen = () => {
+  //   tauriHandleToggleFullScreen();
+  //   setIsDropdownOpen?.(false);
+  // };
 
   // const handleSync = () => {
   //   if (!user) {

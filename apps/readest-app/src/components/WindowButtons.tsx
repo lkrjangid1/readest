@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import React, { useEffect, useRef } from 'react';
 import { useEnv } from '@/context/EnvContext';
 
-import { tauriHandleMinimize, tauriHandleToggleMaximize, tauriHandleClose } from '@/utils/window';
+import { tauriHandleMinimize, tauriHandleToggleMaximize } from '@/utils/window';
 import { isTauriAppPlatform } from '@/services/environment';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -165,6 +165,7 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
   }, []);
 
   const handleMinimize = async () => {
+    onClose;
     if (onMinimize) {
       onMinimize();
     } else {
@@ -180,13 +181,13 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
     }
   };
 
-  const handleClose = async () => {
-    if (onClose) {
-      onClose();
-    } else {
-      tauriHandleClose();
-    }
-  };
+  // const handleClose = async () => {
+  //   if (onClose) {
+  //     onClose();
+  //   } else {
+  //     tauriHandleClose();
+  //   }
+  // };
 
   return (
     <div
