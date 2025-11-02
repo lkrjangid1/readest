@@ -277,9 +277,9 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
         onClick={handleSync}
       /> */}
 
-      <hr aria-hidden='true' className='border-base-300 my-1' />
+      {/* <hr aria-hidden='true' className='border-base-300 my-1' /> */}
 
-      {appService?.hasWindow && <MenuItem label={_('Fullscreen')} onClick={handleFullScreen} />}
+      {/* {appService?.hasWindow && <MenuItem label={_('Fullscreen')} onClick={handleFullScreen} />}
       <MenuItem
         label={
           themeMode === 'dark'
@@ -290,7 +290,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({ bookKey, setIsDropdownOpen }) => {
         }
         Icon={themeMode === 'dark' ? BiMoon : themeMode === 'light' ? BiSun : TbSunMoon}
         onClick={cycleThemeMode}
-      />
+      /> */}
       <MenuItem
         label={_('Invert Image In Dark Mode')}
         disabled={!isDarkMode}
