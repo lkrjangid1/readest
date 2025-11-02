@@ -8,6 +8,17 @@ import { EnvConfigType, isWebAppPlatform } from '@/services/environment';
 import { SystemSettings } from '@/types/settings';
 import { Insets } from '@/types/misc';
 
+declare global {
+  interface Window {
+    __READestThemeBridge?: {
+      setThemeMode: (mode?: ThemeMode) => void;
+      setThemeColor: (color?: string) => void;
+      setTheme: (mode?: ThemeMode, color?: string) => void;
+      getTheme: () => { themeMode: ThemeMode; themeColor: string };
+    };
+  }
+}
+
 interface ThemeState {
   themeMode: ThemeMode;
   themeColor: string;
@@ -134,6 +145,33 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     },
   };
 });
+
+const validThemeModes: ThemeMode[] = ['auto', 'light', 'dark'];
+
+if (typeof window !== 'undefined') {
+  window.__READestThemeBridge = {
+    setThemeMode: (mode) => {
+      if (!mode || !validThemeModes.includes(mode)) return;
+      useThemeStore.getState().setThemeMode(mode);
+    },
+    setThemeColor: (color) => {
+      if (!color) return;
+      useThemeStore.getState().setThemeColor(color);
+    },
+    setTheme: (mode, color) => {
+      if (mode && validThemeModes.includes(mode)) {
+        useThemeStore.getState().setThemeMode(mode);
+      }
+      if (color) {
+        useThemeStore.getState().setThemeColor(color);
+      }
+    },
+    getTheme: () => ({
+      themeMode: useThemeStore.getState().themeMode,
+      themeColor: useThemeStore.getState().themeColor,
+    }),
+  };
+}
 
 export const loadDataTheme = () => {
   if (typeof localStorage === 'undefined' || typeof document === 'undefined') return;

@@ -8,6 +8,28 @@ window.FlutterReaderAPI = {
   bookCache: new Map(),
   currentBook: null,
 
+  // Apply theme changes coming from Flutter
+  applyTheme(theme = {}) {
+    try {
+      const validModes = ['auto', 'light', 'dark'];
+      const mode = validModes.includes(theme.mode) ? theme.mode : localStorage.getItem('themeMode') || 'auto';
+      const color = theme.color || localStorage.getItem('themeColor') || 'default';
+
+      localStorage.setItem('themeMode', mode);
+      localStorage.setItem('themeColor', color);
+
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = mode === 'dark' || (mode === 'auto' && systemDark);
+      document.documentElement.setAttribute('data-theme', `${color}-${isDark ? 'dark' : 'light'}`);
+
+      if (window.__READestThemeBridge && typeof window.__READestThemeBridge.setTheme === 'function') {
+        window.__READestThemeBridge.setTheme(mode, color);
+      }
+    } catch (error) {
+      console.log('Failed to apply theme from Flutter:', error);
+    }
+  },
+
   // Initialize reader with file path
   async openBookFromPath(filePath, options = {}) {
     try {
@@ -275,6 +297,26 @@ window.FlutterReaderAPI = {
     }
   }
 };
+
+window.addEventListener('flutter-theme-changed', (event) => {
+  try {
+    window.FlutterReaderAPI.applyTheme(event.detail || {});
+  } catch (error) {
+    console.log('Failed to handle flutter-theme-changed event:', error);
+  }
+});
+
+(() => {
+  try {
+    const mode = localStorage.getItem('themeMode');
+    const color = localStorage.getItem('themeColor');
+    if (mode || color) {
+      window.FlutterReaderAPI.applyTheme({ mode, color });
+    }
+  } catch (error) {
+    // ignore
+  }
+})();
 
 // Notify listeners that the FlutterReaderAPI is ready for use
 try {
