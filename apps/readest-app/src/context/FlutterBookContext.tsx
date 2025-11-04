@@ -48,6 +48,11 @@ declare global {
       bookId: string;
       book: FlutterBook;
     }>;
+    'flutter-reader-update': CustomEvent<{
+      bookId: string;
+      book: FlutterBook;
+      isDynamicLoad: boolean;
+    }>;
   }
 }
 
@@ -62,7 +67,29 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
         setFlutterBook(book);
       };
 
+      // Listen for Flutter reader update event (for dynamic loading)
+      const handleReaderUpdate = (event: CustomEvent<{bookId: string; book: FlutterBook; isDynamicLoad: boolean}>) => {
+        console.log('Received flutter-reader-update event:', event.detail);
+        const book = event.detail.book;
+        setFlutterBook(book);
+
+        // Force a re-check of the global book data for dynamic loading
+        if (event.detail.isDynamicLoad) {
+          setTimeout(() => {
+            const bookData = window.__FLUTTER_BOOK_DATA__;
+            if (bookData && bookData.book) {
+              const bookWithFile = {
+                ...bookData.book,
+                file: bookData.file || bookData.book.file
+              };
+              setFlutterBook(bookWithFile);
+            }
+          }, 100);
+        }
+      };
+
       window.addEventListener('flutter-reader-ready', handleReaderReady);
+      window.addEventListener('flutter-reader-update', handleReaderUpdate);
 
       // Check if book data is already available
       const checkExistingData = () => {
@@ -82,6 +109,7 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
 
       return () => {
         window.removeEventListener('flutter-reader-ready', handleReaderReady);
+        window.removeEventListener('flutter-reader-update', handleReaderUpdate);
         clearTimeout(timeoutId);
       };
     }

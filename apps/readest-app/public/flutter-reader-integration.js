@@ -35,6 +35,12 @@ window.FlutterReaderAPI = {
     try {
       console.log('Opening book from path:', filePath);
 
+      // Skip invalid or empty file paths
+      if (!filePath || filePath.trim() === '' || filePath === 'read.html' || filePath.includes('read.html')) {
+        console.log('Skipping invalid file path:', filePath);
+        return { success: false, error: 'Invalid or empty file path' };
+      }
+
       // For Flutter InAppWebView, we need to handle file loading differently
       let file;
       let fileName = filePath.split('/').pop() || 'unknown';
@@ -145,10 +151,12 @@ window.FlutterReaderAPI = {
       this.bookCache.set(bookId, book);
       this.currentBook = book;
 
-      // Initialize reader
-      await this.initializeReader(bookId);
+      // Initialize reader without full page reload
+      await this.initializeReaderDynamic(bookId);
 
-      return { success: true, bookId };
+      const result = { success: true, bookId };
+      console.log('openBookFromPath result:', JSON.stringify(result));
+      return result;
     } catch (error) {
       console.error('Error opening book:', error);
       return { success: false, error: error.message };
@@ -236,6 +244,72 @@ window.FlutterReaderAPI = {
 
     // Trigger reader initialization
     this.notifyReaderReady();
+  },
+
+  // New method for dynamic reader initialization without page reload
+  async initializeReaderDynamic(bookId) {
+    const book = this.bookCache.get(bookId);
+    if (!book) {
+      throw new Error('Book not found in cache');
+    }
+
+    console.log('Initializing reader dynamically for book:', book.title);
+    console.log('Book data:', JSON.stringify({ bookId, title: book.title, format: book.format, filePath: book.filePath }));
+
+    // Wait for Next.js to initialize if needed
+    if (typeof window !== 'undefined') {
+      let attempts = 0;
+      while (typeof window.__NEXT_LOADED_PAGES__ === 'undefined' && attempts < 30) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      console.log('Next.js loaded after', attempts, 'attempts');
+    }
+
+    // Inject book data into the page
+    window.__FLUTTER_BOOK_DATA__ = {
+      book,
+      bookId,
+      isFlutterMode: true,
+      isDynamicLoad: true
+    };
+
+    // Update URL params to match expected format
+    if (window.history && window.location) {
+      const url = new URL(window.location);
+      url.searchParams.set('ids', bookId);
+      url.searchParams.set('file', book.filePath);
+      window.history.replaceState({}, '', url);
+      console.log('Updated URL with bookId:', bookId, 'file:', book.filePath);
+    }
+
+    // Force a reload of the reader page component with new parameters
+    if (typeof window !== 'undefined' && window.location) {
+      // Trigger a route change event to force the reader to reload with new params
+      const popStateEvent = new PopStateEvent('popstate', { state: {} });
+      window.dispatchEvent(popStateEvent);
+    }
+
+    // Wait a bit for the route change to process
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Trigger reader update for dynamic loading
+    this.notifyReaderUpdate();
+
+    // Also trigger the traditional ready event for compatibility
+    this.notifyReaderReady();
+  },
+
+  // Notify that reader should update with new book
+  notifyReaderUpdate() {
+    const event = new CustomEvent('flutter-reader-update', {
+      detail: {
+        bookId: this.currentBook?.hash,
+        book: this.currentBook,
+        isDynamicLoad: true
+      }
+    });
+    window.dispatchEvent(event);
   },
 
   // Notify that reader is ready

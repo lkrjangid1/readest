@@ -217,6 +217,41 @@ function FlutterReaderContent() {
     importAndLoadBook();
   }, [router.query['file'], appService, hasImported, isImporting, libraryBooks]);
 
+  // Handle dynamic book updates from JavaScript bridge
+  useEffect(() => {
+    const handleDynamicUpdate = (event: any) => {
+      console.log('Read page received flutter-reader-update event:', event.detail);
+      const { bookId: newBookId, isDynamicLoad } = event.detail;
+
+      if (isDynamicLoad && newBookId && newBookId !== bookId) {
+        console.log('Setting new bookId from dynamic update:', newBookId);
+        setBookId(newBookId);
+        setHasImported(true);
+        setIsImporting(false);
+        setError(null);
+      }
+    };
+
+    const handlePopState = () => {
+      console.log('PopState event detected, resetting import state');
+      setHasImported(false);
+      setIsImporting(false);
+      setError(null);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('flutter-reader-update', handleDynamicUpdate);
+      window.addEventListener('popstate', handlePopState);
+
+      return () => {
+        window.removeEventListener('flutter-reader-update', handleDynamicUpdate);
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+
+    return undefined;
+  }, [bookId]);
+
   // Show loading while importing
   if (isImporting) {
     return (
