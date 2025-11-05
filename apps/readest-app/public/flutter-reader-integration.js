@@ -369,6 +369,96 @@ window.FlutterReaderAPI = {
         console.log('Failed to notify Flutter about book close:', error);
       });
     }
+  },
+
+  // Extract metadata from a book file
+  async extractMetadata(filePath) {
+    try {
+      console.log('Extracting metadata from:', filePath);
+
+      if (!filePath || filePath.trim() === '') {
+        return { success: false, error: 'Invalid file path' };
+      }
+
+      // Wait for the metadata extractor to be available (up to 10 seconds)
+      let attempts = 0;
+      const maxAttempts = 100; // 100 * 100ms = 10 seconds
+
+      console.log('Waiting for metadata extractor to load...');
+      while (!window.__extractBookMetadata && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+
+        // Log progress every second
+        if (attempts % 10 === 0) {
+          console.log(`Still waiting for metadata extractor... (${attempts * 100}ms)`);
+        }
+      }
+
+      if (!window.__extractBookMetadata) {
+        console.error(`Metadata extractor not available after waiting ${attempts * 100}ms`);
+        console.log('Available window properties:', Object.keys(window).filter(k => k.includes('extract') || k.includes('metadata')));
+        return { success: false, error: 'Metadata extractor not loaded' };
+      }
+
+      console.log(`Metadata extractor found after ${attempts * 100}ms`);
+
+      // Load the file
+      let file;
+      let fileName = filePath.split('/').pop() || 'unknown';
+
+      // Use Flutter bridge to read file
+      if (window.flutter_inappwebview) {
+        try {
+          const fileData = await window.flutter_inappwebview.callHandler('readBookFile', filePath);
+          if (fileData && fileData.content) {
+            let bytes;
+            if (Array.isArray(fileData.content)) {
+              bytes = Uint8Array.from(fileData.content);
+            } else if (
+              typeof fileData.content === 'object' &&
+              fileData.content.data &&
+              Array.isArray(fileData.content.data)
+            ) {
+              bytes = Uint8Array.from(fileData.content.data);
+            } else if (typeof fileData.content === 'string') {
+              const binary = atob(fileData.content);
+              bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+              }
+            } else if (fileData.content instanceof Uint8Array) {
+              bytes = fileData.content;
+            }
+
+            if (bytes) {
+              file = new File([bytes], fileName, { type: this.getMimeType(fileName) });
+            }
+          }
+        } catch (error) {
+          console.error('Flutter bridge file read failed:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      if (!file) {
+        return { success: false, error: 'Unable to load file' };
+      }
+
+      // Call the bundled metadata extractor function
+      console.log('Calling window.__extractBookMetadata');
+      const result = await window.__extractBookMetadata(file, fileName);
+      console.log('Metadata extraction result:', result);
+
+      return result;
+    } catch (error) {
+      console.error('Error extracting metadata:', error);
+      return {
+        success: false,
+        error: error.message || 'Unknown error',
+        stack: error.stack
+      };
+    }
   }
 };
 

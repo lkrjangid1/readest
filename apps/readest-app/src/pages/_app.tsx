@@ -2,6 +2,7 @@ import Head from 'next/head';
 import { AppProps } from 'next/app';
 import { EnvProvider } from '@/context/EnvContext';
 import Providers from '@/components/Providers';
+import MetadataExtractorLoader from '@/components/MetadataExtractorLoader';
 
 import '../styles/globals.css';
 
@@ -29,6 +30,7 @@ function MyApp({ Component, pageProps }: AppProps) {
       </Head>
       <EnvProvider>
         <Providers>
+          <MetadataExtractorLoader />
           <Component {...pageProps} />
         </Providers>
       </EnvProvider>

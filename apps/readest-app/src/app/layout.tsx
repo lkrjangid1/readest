@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { EnvProvider } from '@/context/EnvContext';
 import Providers from '@/components/Providers';
+import MetadataExtractorLoader from '@/components/MetadataExtractorLoader';
 
 import '../styles/globals.css';
 
@@ -71,7 +72,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <EnvProvider>
-          <Providers>{children}</Providers>
+          <Providers>
+            <MetadataExtractorLoader />
+            {children}
+          </Providers>
         </EnvProvider>
       </body>
     </html>
