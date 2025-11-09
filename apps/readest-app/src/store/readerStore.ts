@@ -21,6 +21,142 @@ import { useSettingsStore } from './settingsStore';
 import { useBookDataStore } from './bookDataStore';
 import { useLibraryStore } from './libraryStore';
 
+type FlutterProgressPayload = {
+  progress: [number, number];
+  filePath?: string;
+};
+
+const pendingFlutterProgress: FlutterProgressPayload[] = [];
+let flutterBridgeListenerAttached = false;
+let flutterBridgePollTimer: number | null = null;
+
+function notifyFlutterAboutProgress(progress: [number, number], filePath?: string) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const payload: FlutterProgressPayload = {
+    progress,
+    filePath:
+      filePath ||
+      (window as any).__FLUTTER_BOOK_DATA__?.book?.filePath ||
+      (window as any).__FLUTTER_BOOK_DATA__?.filePath,
+  };
+
+  if (!trySendProgressToFlutter(payload)) {
+    queueProgressPayload(payload);
+  }
+}
+
+function queueProgressPayload(payload: FlutterProgressPayload) {
+  if (pendingFlutterProgress.length > 200) {
+    pendingFlutterProgress.shift();
+  }
+  pendingFlutterProgress.push(payload);
+  startFlutterBridgePolling();
+  attachFlutterBridgeListener();
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[FlutterBridge] queueing progress update', payload);
+  }
+}
+
+function trySendProgressToFlutter(payload: FlutterProgressPayload): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  try {
+    const bridgePayload = {
+      progress: payload.progress,
+      bookId:
+        (window as any).__FLUTTER_BOOK_DATA__?.book?.hash ||
+        (window as any).FlutterReaderAPI?.currentBook?.hash,
+      filePath: payload.filePath,
+    };
+
+    const webviewBridge = (window as any).flutter_inappwebview;
+    if (webviewBridge?.callHandler) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[FlutterBridge] sending progress via flutter_inappwebview', bridgePayload);
+      }
+      webviewBridge.callHandler('onProgressUpdate', bridgePayload);
+      return true;
+    }
+
+    const flutterApi = (window as any).FlutterReaderAPI;
+    if (!flutterApi || typeof flutterApi.setProgress !== 'function') {
+      return false;
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[FlutterBridge] sending progress via FlutterReaderAPI', payload);
+    }
+    flutterApi.setProgress(payload.progress, { filePath: payload.filePath });
+    return true;
+  } catch (error) {
+    console.warn('Failed to notify Flutter about progress:', error);
+    return false;
+  }
+}
+
+function attachFlutterBridgeListener() {
+  if (typeof window === 'undefined' || flutterBridgeListenerAttached) {
+    return;
+  }
+
+  flutterBridgeListenerAttached = true;
+
+  const flushQueue = () => {
+    if (pendingFlutterProgress.length === 0) {
+      return;
+    }
+
+    let safety = 0;
+    while (pendingFlutterProgress.length && safety < 50) {
+      safety += 1;
+      const update = pendingFlutterProgress.shift()!;
+      const sent = trySendProgressToFlutter(update);
+      if (!sent) {
+        pendingFlutterProgress.unshift(update);
+        break;
+      }
+    }
+  };
+
+  const readyEvents = ['flutter-reader-api-ready', 'flutter-reader-ready', 'flutter-reader-update'] as const;
+
+  readyEvents.forEach((eventName) => {
+    window.addEventListener(eventName as any, flushQueue as EventListener);
+  });
+
+  window.addEventListener('load', flushQueue as EventListener);
+  setTimeout(flushQueue, 0);
+}
+
+function startFlutterBridgePolling() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (flutterBridgePollTimer !== null) {
+    return;
+  }
+
+  flutterBridgePollTimer = window.setInterval(() => {
+    if (pendingFlutterProgress.length === 0) {
+      if (flutterBridgePollTimer !== null) {
+        window.clearInterval(flutterBridgePollTimer);
+        flutterBridgePollTimer = null;
+      }
+      return;
+    }
+
+    const next = pendingFlutterProgress[0]!;
+    if (trySendProgressToFlutter(next)) {
+      pendingFlutterProgress.shift();
+    }
+  }, 1000);
+}
+
 interface ViewState {
   /* Unique key for each book view */
   key: string;
@@ -285,8 +421,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
               viewSettings,
             },
           },
-        },
-      }));
+  },
+}));
     }
     set((state) => ({
       viewStates: {
@@ -347,6 +483,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
           },
         },
       }));
+
+      notifyFlutterAboutProgress(progress, bookData.book?.filePath);
 
       return {
         viewStates: {

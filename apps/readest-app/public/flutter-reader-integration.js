@@ -329,20 +329,26 @@ window.FlutterReaderAPI = {
   },
 
   // Set reading progress
-  setProgress(progress) {
+  setProgress(progress, options = {}) {
     if (this.currentBook) {
       this.currentBook.progress = progress;
-      this.notifyProgressUpdate(progress);
+      if (options.filePath) {
+        this.currentBook.filePath = options.filePath;
+      }
+      this.notifyProgressUpdate(progress, options);
     }
   },
 
   // Notify Flutter about progress updates
-  notifyProgressUpdate(progress) {
+  notifyProgressUpdate(progress, options = {}) {
+    const payload = {
+      progress,
+      bookId: this.currentBook?.hash,
+      filePath: options.filePath || this.currentBook?.filePath || window.__FLUTTER_BOOK_DATA__?.book?.filePath
+    };
+    console.debug('[FlutterReaderAPI] notifying Flutter about progress', payload);
     if (window.flutter_inappwebview) {
-      window.flutter_inappwebview.callHandler('onProgressUpdate', {
-        progress,
-        bookId: this.currentBook?.hash
-      }).catch(error => {
+      window.flutter_inappwebview.callHandler('onProgressUpdate', payload).catch(error => {
         console.log('Failed to notify Flutter about progress:', error);
       });
     }
