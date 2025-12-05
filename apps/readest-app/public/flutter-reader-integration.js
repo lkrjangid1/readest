@@ -8,6 +8,23 @@ window.FlutterReaderAPI = {
   bookCache: new Map(),
   currentBook: null,
 
+  async _fetchFileThroughHost(filePath, fileName) {
+    if (!filePath) return null;
+    try {
+      const origin = window.location.origin || '';
+      const proxyUrl = `${origin}/file-proxy?path=${encodeURIComponent(filePath)}`;
+      const response = await fetch(proxyUrl);
+      if (!response.ok) {
+        throw new Error(`Proxy fetch failed with status ${response.status}`);
+      }
+      const blob = await response.blob();
+      return new File([blob], fileName, { type: this.getMimeType(fileName) });
+    } catch (error) {
+      console.warn('Local proxy fetch failed:', error);
+      return null;
+    }
+  },
+
   // Apply theme changes coming from Flutter
   applyTheme(theme = {}) {
     try {
@@ -45,8 +62,21 @@ window.FlutterReaderAPI = {
       let file;
       let fileName = filePath.split('/').pop() || 'unknown';
 
+      // Prefer streaming through the embedded host server to avoid huge bridge transfers
+      try {
+        file = await this._fetchFileThroughHost(filePath, fileName);
+        if (file) {
+          console.log('Loaded file via Flutter host proxy:', {
+            size: file.size,
+            name: fileName,
+          });
+        }
+      } catch (error) {
+        console.log('Host proxy fetch failed, falling back to bridge', error);
+      }
+
       // Try different methods to load the file
-      if (window.flutter_inappwebview) {
+      if (!file && window.flutter_inappwebview) {
         // Use Flutter bridge to read file
         try {
           const fileData = await window.flutter_inappwebview.callHandler('readBookFile', filePath);
