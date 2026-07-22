@@ -22,7 +22,6 @@ import { saveViewSettings } from '@/helpers/settings';
 import { HighlighterIcon } from '@/components/HighlighterIcon';
 import Dropdown from '@/components/Dropdown';
 import ModalPortal from '@/components/ModalPortal';
-import WindowButtons from '@/components/WindowButtons';
 import QuickActionMenu from './annotator/QuickActionMenu';
 import SidebarToggler from './SidebarToggler';
 import BookmarkToggler from './BookmarkToggler';
@@ -51,7 +50,6 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   isHoveredAnim,
   gridInsets,
   screenInsets,
-  onCloseBook,
   onGoToLibrary,
   onDropdownOpenChange,
 }) => {
@@ -61,7 +59,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
   const headerRef = useRef<HTMLDivElement>(null);
   const { isTrafficLightVisible } = useTrafficLight(headerRef);
   const { trafficLightInFullscreen, setTrafficLightVisibility } = useTrafficLightStore();
-  const { bookKeys, hoveredBookKey } = useReaderStore();
+  const { hoveredBookKey } = useReaderStore();
   const { isDarkMode, systemUIVisible, statusBarHeight } = useThemeStore();
   const { isSideBarVisible, getIsSideBarVisible } = useSidebarStore();
   const { getView, getViewSettings, setHoveredBookKey } = useReaderStore();
@@ -291,10 +289,7 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
             toggleButton={<MdOutlineMenu />}
             onToggle={handleToggleDropdown}
           >
-            <ViewMenu
-              bookKey={bookKey}
-              onShowMetaHashDialog={() => setIsMetaHashDialogOpen(true)}
-            />
+            <ViewMenu bookKey={bookKey} />
           </Dropdown>
           {isMetaHashDialogOpen && (
             <ModalPortal showOverlay={false}>

@@ -5,7 +5,7 @@ import { useSettingsStore } from '@/store/settingsStore';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useCommandPalette } from '@/components/command-palette';
-import { RiFontSize, RiShareLine } from 'react-icons/ri';
+import { RiFontSize } from 'react-icons/ri';
 import { RiDashboardLine, RiTranslate } from 'react-icons/ri';
 import { VscSymbolColor } from 'react-icons/vsc';
 import { PiDotsThreeVerticalBold, PiRobot, PiSpeakerHigh } from 'react-icons/pi';
@@ -24,7 +24,6 @@ import { getCommandPaletteShortcut } from '@/services/environment';
 import FontPanel from './FontPanel';
 import LayoutPanel from './LayoutPanel';
 import ThemePanel from './ThemePanel';
-import IntegrationsPanel from './IntegrationsPanel';
 import Dropdown from '@/components/Dropdown';
 import Dialog from '@/components/Dialog';
 import DialogMenu from './DialogMenu';
@@ -105,11 +104,6 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       tab: 'Language',
       icon: RiTranslate,
       label: _('Language'),
-    },
-    {
-      tab: 'Integrations',
-      icon: RiShareLine,
-      label: _('Integrations'),
     },
     {
       tab: 'AI',
@@ -473,7 +467,6 @@ const SettingsDialog: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           />
         )}
         {activePanel === 'AI' && <AIPanel />}
-        {activePanel === 'Integrations' && <IntegrationsPanel />}
         {activePanel === 'Custom' && (
           <MiscPanel
             bookKey={bookKey}
