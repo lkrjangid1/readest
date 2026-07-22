@@ -62,13 +62,15 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
   useEffect(() => {
     if (isFlutterMode && typeof window !== 'undefined') {
       // Listen for Flutter reader ready event
-      const handleReaderReady = (event: CustomEvent<{bookId: string; book: FlutterBook}>) => {
+      const handleReaderReady = (event: CustomEvent<{ bookId: string; book: FlutterBook }>) => {
         const book = event.detail.book;
         setFlutterBook(book);
       };
 
       // Listen for Flutter reader update event (for dynamic loading)
-      const handleReaderUpdate = (event: CustomEvent<{bookId: string; book: FlutterBook; isDynamicLoad: boolean}>) => {
+      const handleReaderUpdate = (
+        event: CustomEvent<{ bookId: string; book: FlutterBook; isDynamicLoad: boolean }>,
+      ) => {
         console.log('Received flutter-reader-update event:', event.detail);
         const book = event.detail.book;
         setFlutterBook(book);
@@ -80,7 +82,7 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
             if (bookData && bookData.book) {
               const bookWithFile = {
                 ...bookData.book,
-                file: bookData.file || bookData.book.file
+                file: bookData.file || bookData.book.file,
               };
               setFlutterBook(bookWithFile);
             }
@@ -98,7 +100,7 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
           // Include file from global data if available
           const bookWithFile = {
             ...bookData.book,
-            file: bookData.file || bookData.book.file
+            file: bookData.file || bookData.book.file,
           };
           setFlutterBook(bookWithFile);
         }
@@ -127,7 +129,9 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
     }
 
     // Create a mock file only if we have actual file content
-    const file = flutterBook.file || new File([''], flutterBook.title || 'book.pdf', { type: 'application/pdf' });
+    const file =
+      flutterBook.file ||
+      new File([''], flutterBook.title || 'book.pdf', { type: 'application/pdf' });
 
     return {
       book: flutterBook,
@@ -137,8 +141,8 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
         progress: flutterBook.progress || [1, 1],
         location: '',
         viewSettings: {},
-        booknotes: []
-      }
+        booknotes: [],
+      },
     };
   };
 
@@ -146,13 +150,15 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
     if (isFlutterMode && typeof window !== 'undefined') {
       // Save via Flutter bridge
       if (window.flutter_inappwebview) {
-        window.flutter_inappwebview.callHandler('saveBookConfig', {
-          bookId: flutterBook?.hash,
-          config,
-          progress: config.progress
-        }).catch((error) => {
-          console.warn('Failed to save config via Flutter bridge:', error);
-        });
+        window.flutter_inappwebview
+          .callHandler('saveBookConfig', {
+            bookId: flutterBook?.hash,
+            config,
+            progress: config.progress,
+          })
+          .catch((error) => {
+            console.warn('Failed to save config via Flutter bridge:', error);
+          });
       }
 
       // Update local state
@@ -160,7 +166,7 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
         setFlutterBook({
           ...flutterBook,
           progress: config.progress || flutterBook.progress,
-          updatedAt: Date.now()
+          updatedAt: Date.now(),
         });
       }
     }
@@ -171,14 +177,10 @@ export function FlutterBookProvider({ children, isFlutterMode }: FlutterBookProv
     flutterBook,
     setFlutterBook,
     getFlutterBookContent,
-    saveFlutterBookConfig
+    saveFlutterBookConfig,
   };
 
-  return (
-    <FlutterBookContext.Provider value={value}>
-      {children}
-    </FlutterBookContext.Provider>
-  );
+  return <FlutterBookContext.Provider value={value}>{children}</FlutterBookContext.Provider>;
 }
 
 export function useFlutterBook() {

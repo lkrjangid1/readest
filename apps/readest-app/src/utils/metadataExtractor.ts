@@ -48,7 +48,7 @@ function formatValue(value: any): string | null {
  */
 export async function extractBookMetadata(
   file: File,
-  fileName: string
+  fileName: string,
 ): Promise<{ success: boolean; metadata?: ExtractedMetadata; error?: string }> {
   try {
     console.log('[MetadataExtractor] Starting extraction for:', fileName);

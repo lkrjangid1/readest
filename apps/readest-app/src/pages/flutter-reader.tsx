@@ -52,9 +52,9 @@ export default function FlutterReaderTestPage() {
   // Show loading until book is ready
   if (isFlutterMode && !bookId) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <div className='flex items-center justify-center min-h-screen'>
+        <div className='text-center'>
+          <div className='animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4'></div>
           <p>Loading book from: {router.query['file']}</p>
         </div>
       </div>
@@ -64,11 +64,11 @@ export default function FlutterReaderTestPage() {
   // Show file input if no file specified
   if (!router.query['file']) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Flutter Reader Test</h1>
-          <p className="mb-4">Add ?file=YOUR_FILE_PATH to the URL to test</p>
-          <p className="text-sm text-gray-600">
+      <div className='flex items-center justify-center min-h-screen'>
+        <div className='text-center'>
+          <h1 className='text-2xl font-bold mb-4'>Flutter Reader Test</h1>
+          <p className='mb-4'>Add ?file=YOUR_FILE_PATH to the URL to test</p>
+          <p className='text-sm text-gray-600'>
             Example: /flutter-reader?file=/path/to/your/file.pdf
           </p>
         </div>
@@ -82,11 +82,11 @@ export default function FlutterReaderTestPage() {
         <AuthProvider>
           <SyncProvider>
             <FlutterBookProvider isFlutterMode={isFlutterMode}>
-              <div className="min-h-screen bg-gray-100">
-                <div className="p-4">
-                  <h2 className="text-xl font-bold mb-4">Flutter Reader Test Mode</h2>
-                  <p className="mb-4">File: {router.query['file']}</p>
-                  <p className="mb-4">Book ID: {bookId}</p>
+              <div className='min-h-screen bg-gray-100'>
+                <div className='p-4'>
+                  <h2 className='text-xl font-bold mb-4'>Flutter Reader Test Mode</h2>
+                  <p className='mb-4'>File: {router.query['file']}</p>
+                  <p className='mb-4'>Book ID: {bookId}</p>
                 </div>
                 <Reader ids={bookId || ''} />
               </div>

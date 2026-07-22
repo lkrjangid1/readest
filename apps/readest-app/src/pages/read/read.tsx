@@ -13,7 +13,8 @@ import { Book } from '@/types/book';
 const DEFAULT_FILE_SERVER_PORT = '6391';
 
 const isRemoteUrl = (path: string) => /^https?:\/\//i.test(path);
-const isFileProtocol = (path: string) => path.startsWith('file://') || path.startsWith('content://');
+const isFileProtocol = (path: string) =>
+  path.startsWith('file://') || path.startsWith('content://');
 const normalizePath = (value?: string | string[] | null) => {
   if (!value) return '';
   const raw = (Array.isArray(value) ? value[0] : value) ?? '';
@@ -28,7 +29,9 @@ const parseFileParam = (routerQuery: Record<string, string | string[] | undefine
   let filePath = normalizePath(routerQuery['file']);
   if (!filePath && typeof window !== 'undefined') {
     const currentUrl = new URL(window.location.href);
-    filePath = normalizePath(currentUrl.searchParams.get('file') || currentUrl.searchParams.get('path'));
+    filePath = normalizePath(
+      currentUrl.searchParams.get('file') || currentUrl.searchParams.get('path'),
+    );
     if (!filePath) {
       const encodedMatch = currentUrl.href.match(/read\.html%3Ffile=([^&]*)/);
       if (encodedMatch?.[1]) {

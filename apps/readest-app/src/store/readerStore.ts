@@ -133,7 +133,11 @@ function attachFlutterBridgeListener() {
     }
   };
 
-  const readyEvents = ['flutter-reader-api-ready', 'flutter-reader-ready', 'flutter-reader-update'] as const;
+  const readyEvents = [
+    'flutter-reader-api-ready',
+    'flutter-reader-ready',
+    'flutter-reader-update',
+  ] as const;
 
   readyEvents.forEach((eventName) => {
     window.addEventListener(eventName as any, flushQueue as EventListener);
@@ -400,7 +404,11 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       config.booknotes = config.booknotes?.filter((booknote) => booknote.cfi) ?? [];
       // Load cached book navigation (TOC + section fragments) or compute and persist.
       // Flutter books aren't backed by the web nav cache store, so compute inline only.
-      if (!isFlutterBook && book.format === 'EPUB' && bookDoc.rendition?.layout !== 'pre-paginated') {
+      if (
+        !isFlutterBook &&
+        book.format === 'EPUB' &&
+        bookDoc.rendition?.layout !== 'pre-paginated'
+      ) {
         const cachedNav = await appService.loadBookNav(book);
         if (cachedNav?.version === BOOK_NAV_VERSION && process.env.NODE_ENV === 'production') {
           hydrateBookNav(bookDoc, cachedNav);
@@ -529,8 +537,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
               viewSettings,
             },
           },
-  },
-}));
+        },
+      }));
     }
     set((state) => ({
       viewStates: {
