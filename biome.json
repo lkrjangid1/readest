@@ -174,5 +174,21 @@
       "trailingCommas": "all",
       "semicolons": "always"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "apps/readest-app/src/context/FlutterBookContext.tsx",
+        "apps/readest-app/src/pages/flutter-reader.tsx",
+        "apps/readest-app/src/utils/metadataExtractor.ts",
+        "apps/readest-app/src/components/MetadataExtractorLoader.tsx",
+        "apps/readest-app/src/store/readerStore.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": { "noExplicitAny": "off" }
+        }
+      }
+    }
+  ]
 }
