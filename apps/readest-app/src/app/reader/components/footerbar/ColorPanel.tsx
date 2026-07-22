@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PiSun, PiMoon } from 'react-icons/pi';
 import { TbSunMoon } from 'react-icons/tb';
 import { useEnv } from '@/context/EnvContext';
@@ -21,16 +21,21 @@ const SCREEN_BRIGHTNESS_LIMITS = {
 interface ColorPanelProps {
   actionTab: string;
   bottomOffset: string;
+  forceMobileLayout: boolean;
 }
 
-export const ColorPanel: React.FC<ColorPanelProps> = ({ actionTab, bottomOffset }) => {
+export const ColorPanel: React.FC<ColorPanelProps> = ({
+  actionTab,
+  bottomOffset,
+  forceMobileLayout,
+}) => {
   const _ = useTranslation();
   const { envConfig, appService } = useEnv();
   const { settings } = useSettingsStore();
   const { getScreenBrightness, setScreenBrightness } = useDeviceControlStore();
   const { themeMode, themeColor, isDarkMode, setThemeMode, setThemeColor } = useThemeStore();
 
-  const [screenBrightnessValue, setScreenBrightnessValue] = React.useState(
+  const [screenBrightnessValue, setScreenBrightnessValue] = useState(
     settings.screenBrightness >= 0 ? settings.screenBrightness : SCREEN_BRIGHTNESS_LIMITS.DEFAULT,
   );
 
@@ -72,14 +77,27 @@ export const ColorPanel: React.FC<ColorPanelProps> = ({ actionTab, bottomOffset 
   };
 
   const classes = clsx(
-    'footerbar-color-mobile bg-base-200 absolute flex w-full flex-col items-center gap-y-8 px-4 transition-all sm:hidden',
+    'footerbar-color-mobile not-eink:bg-base-200 eink:bg-base-100 absolute flex w-full flex-col items-center gap-y-8 px-4 transition-all',
+    'eink:border-base-content eink:border-t',
+    !forceMobileLayout && 'sm:hidden',
+    // Paddings stay constant in both states (the slide is transform-only) so
+    // offsetHeight always reports the panel's settled height; the TTS mini
+    // player measures it to stack above the expanded panel.
+    'pb-4 pt-8',
     actionTab === 'color'
-      ? 'pointer-events-auto translate-y-0 pb-4 pt-8 ease-out'
-      : 'pointer-events-none invisible translate-y-full overflow-hidden pb-0 pt-0 ease-in',
+      ? 'pointer-events-auto translate-y-0 ease-out'
+      : 'pointer-events-none invisible translate-y-full overflow-hidden ease-in',
   );
 
   return (
-    <div className={classes} style={{ bottom: bottomOffset }}>
+    <div
+      className={classes}
+      style={{
+        bottom: appService?.isAndroidApp
+          ? `calc(env(safe-area-inset-bottom) + 64px)`
+          : bottomOffset,
+      }}
+    >
       {appService?.hasScreenBrightness && (
         <Slider
           label={_('Screen Brightness')}

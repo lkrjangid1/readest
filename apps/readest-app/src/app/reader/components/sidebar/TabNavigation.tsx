@@ -1,11 +1,13 @@
 import clsx from 'clsx';
 import React from 'react';
-import { MdBookmarkBorder as BookmarkIcon } from 'react-icons/md';
-import { IoIosList as TOCIcon } from 'react-icons/io';
-import { PiNotePencil as NoteIcon } from 'react-icons/pi';
+import { MdBookmarkBorder } from 'react-icons/md';
+import { IoIosList } from 'react-icons/io';
+import { PiNotePencil } from 'react-icons/pi';
+import { LuMessageSquare } from 'react-icons/lu';
 
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useSettingsStore } from '@/store/settingsStore';
 
 const TabNavigation: React.FC<{
   activeTab: string;
@@ -13,32 +15,48 @@ const TabNavigation: React.FC<{
 }> = ({ activeTab, onTabChange }) => {
   const _ = useTranslation();
   const { appService } = useEnv();
+  const { settings } = useSettingsStore();
+  const aiEnabled = settings?.aiSettings?.enabled ?? false;
 
-  const tabs = ['toc', 'annotations', 'bookmarks'];
+  const forceMobileLayout =
+    !!appService?.isMobile && window.innerWidth >= 640 && window.innerWidth <= window.innerHeight;
+  const isMobile = forceMobileLayout || window.innerWidth < 640 || window.innerHeight < 640;
+  const tabs = ['toc', 'annotations', 'bookmarks', ...(aiEnabled ? ['history'] : [])];
+
+  const getTabLabel = (tab: string) => {
+    switch (tab) {
+      case 'toc':
+        return _('TOC');
+      case 'annotations':
+        return _('Annotate');
+      case 'bookmarks':
+        return _('Bookmark');
+      case 'history':
+        return _('Chat');
+      default:
+        return '';
+    }
+  };
 
   return (
     <div
       className={clsx(
-        'bottom-tab border-base-300/50 bg-base-200/20 relative flex w-full border-t',
+        'bottom-tab border-base-300/50 bg-base-200 flex w-full border-t',
         appService?.hasRoundedWindow && 'rounded-window-bottom-left',
+        isMobile && 'h-[65px]',
       )}
       dir='ltr'
     >
-      <div
-        className={clsx(
-          'bg-base-300/85 absolute bottom-1.5 start-1 z-10 h-[calc(100%-12px)] w-[calc(33.3%-8px)] rounded-lg',
-          'transform transition-transform duration-300',
-          activeTab === 'toc' && 'translate-x-0',
-          activeTab === 'annotations' && 'translate-x-[calc(100%+8px)]',
-          activeTab === 'bookmarks' && 'translate-x-[calc(200%+16px)]',
-        )}
-      />
       {tabs.map((tab) => (
         <div
           key={tab}
           tabIndex={0}
           role='button'
-          className='z-[11] m-1.5 flex-1 cursor-pointer rounded-md p-2'
+          className={clsx(
+            'flex-1 m-1.5 cursor-pointer rounded-lg transition-colors duration-200',
+            activeTab === tab && 'bg-base-300/85',
+            isMobile ? 'p-3' : 'p-2',
+          )}
           onClick={() => onTabChange(tab)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -46,18 +64,18 @@ const TabNavigation: React.FC<{
               onTabChange(tab);
             }
           }}
-          title={tab === 'toc' ? _('TOC') : tab === 'annotations' ? _('Annotate') : _('Bookmark')}
-          aria-label={
-            tab === 'toc' ? _('TOC') : tab === 'annotations' ? _('Annotate') : _('Bookmark')
-          }
+          title={getTabLabel(tab)}
+          aria-label={getTabLabel(tab)}
         >
-          <div className={clsx('m-0 flex h-6 items-center p-0')}>
+          <div className={clsx('flex h-6 items-center p-0', isMobile ? 'm-0.5' : 'm-0')}>
             {tab === 'toc' ? (
-              <TOCIcon className='mx-auto' />
+              <IoIosList className='mx-auto' />
             ) : tab === 'annotations' ? (
-              <NoteIcon className='mx-auto' />
+              <PiNotePencil className='mx-auto' />
+            ) : tab === 'bookmarks' ? (
+              <MdBookmarkBorder className='mx-auto' />
             ) : (
-              <BookmarkIcon className='mx-auto' />
+              <LuMessageSquare className='mx-auto' />
             )}
           </div>
         </div>

@@ -1,9 +1,7 @@
 import clsx from 'clsx';
 import React, { useEffect, useState } from 'react';
-import { MdSettings } from 'react-icons/md';
 
 import {
-  ANDROID_FONTS,
   CJK_EXCLUDE_PATTENS,
   CJK_FONTS_PATTENS,
   CJK_SANS_SERIF_FONTS,
@@ -22,17 +20,19 @@ import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useCustomFontStore } from '@/store/customFontStore';
-import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { getOSPlatform, isCJKEnv } from '@/utils/misc';
 import { getSysFontsList } from '@/utils/bridge';
 import { isCJKStr } from '@/utils/lang';
 import { isTauriAppPlatform } from '@/services/environment';
 import { useResetViewSettings } from '@/hooks/useResetSettings';
+import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { saveViewSettings } from '@/helpers/settings';
 import { SettingsPanelPanelProp } from './SettingsDialog';
+import { BoxedList, NavigationRow, SettingLabel, SettingsRow } from './primitives';
 import NumberInput from './NumberInput';
 import FontDropdown from './FontDropDown';
 import CustomFonts from './CustomFonts';
+import { Toggle } from '../primitives/toggle';
 
 const genCJKFontsList = (sysFonts: string[]) => {
   return Array.from(new Set([...sysFonts, ...CJK_SERIF_FONTS, ...CJK_SANS_SERIF_FONTS]))
@@ -52,6 +52,7 @@ interface FontFaceProps {
   moreOptions?: string[];
   selected: string;
   onSelect: (option: string) => void;
+  'data-setting-id'?: string;
 }
 
 const handleFontFaceFont = (option: string, family: string) => {
@@ -70,11 +71,15 @@ const FontFace = ({
   moreOptions,
   selected,
   onSelect,
+  'data-setting-id': settingId,
 }: FontFaceProps) => {
   const _ = useTranslation();
   return (
-    <div className={clsx('config-item', className)}>
-      <span className='line-clamp-2 min-w-10'>{label}</span>
+    <div
+      className={clsx('flex h-14 items-center justify-between pe-4', className)}
+      data-setting-id={settingId}
+    >
+      <SettingLabel className='min-w-10'>{label}</SettingLabel>
       <FontDropdown
         family={family}
         options={options.map((option) => ({ option, label: _(option) }))}
@@ -92,16 +97,9 @@ const FontPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   const { envConfig, appService } = useEnv();
   const { getView, getViewSettings } = useReaderStore();
   const { settings, fontPanelView, setFontPanelView } = useSettingsStore();
-  const {
-    fonts: allCustomFonts,
-    getAllFonts,
-    getFontFamilies,
-    removeFont,
-    saveCustomFonts,
-  } = useCustomFontStore();
+  const { fonts: allCustomFonts, getFontFamilies } = useCustomFontStore();
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
   const view = getView(bookKey);
-  const iconSize18 = useResponsiveSize(18);
 
   const fontFamilyOptions = [
     {
@@ -130,7 +128,7 @@ const FontPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
       defaultSysFonts = IOS_FONTS;
       break;
     case 'android':
-      defaultSysFonts = ANDROID_FONTS;
+      defaultSysFonts = [];
       break;
     default:
       break;
@@ -165,12 +163,6 @@ const FontPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
       monospaceFont: setMonospaceFont,
       fontWeight: setFontWeight,
     });
-    getAllFonts().forEach((font) => {
-      if (removeFont(font.id)) {
-        appService!.deleteFont(font);
-      }
-    });
-    saveCustomFonts(envConfig);
   };
 
   const handleManageCustomFonts = () => {
@@ -180,6 +172,19 @@ const FontPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   const handleBackToMain = () => {
     setFontPanelView('main-fonts');
   };
+
+  // Android Back / Esc: when the Custom Fonts sub-page is open, intercept
+  // and step back to main-fonts instead of letting <Dialog>'s own listener
+  // close the entire Settings dialog. This works because
+  // `useKeyDownActions` registers its sync `native-key-down` listener
+  // *after* <Dialog>'s, and `dispatchSync` walks listeners LIFO — so when
+  // enabled this hook claims the Back press first and `return true`
+  // consumes it; when disabled (sub-page closed) Back falls through to
+  // <Dialog> and closes the dialog as before.
+  useKeyDownActions({
+    enabled: fontPanelView === 'custom-fonts',
+    onCancel: handleBackToMain,
+  });
 
   useEffect(() => {
     onRegisterReset(handleReset);
@@ -204,7 +209,7 @@ const FontPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   }, [viewSettings.serifFont, viewSettings.sansSerifFont, viewSettings.monospaceFont]);
 
   useEffect(() => {
-    if (isTauriAppPlatform()) {
+    if (isTauriAppPlatform() && appService && !appService.isAndroidApp) {
       getSysFontsList().then((res) => {
         if (res.error || Object.keys(res.fonts).length === 0) {
           console.error('Failed to get system fonts list:', res.error);
@@ -227,7 +232,7 @@ const FontPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
         setSysFonts([...new Set(processedFonts)].sort((a, b) => a.localeCompare(b)));
       });
     }
-  }, []);
+  }, [appService]);
 
   useEffect(() => {
     saveViewSettings(envConfig, bookKey, 'defaultFont', defaultFont);
@@ -297,132 +302,102 @@ const FontPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
 
   return (
     <div className='my-4 w-full space-y-6'>
-      <div className='flex items-center justify-between'>
-        <h2 className='font-medium'>{_('Override Book Font')}</h2>
-        <input
-          type='checkbox'
-          className='toggle'
-          checked={overrideFont}
-          onChange={() => setOverrideFont(!overrideFont)}
+      <label
+        data-setting-id='settings.font.overrideBookFont'
+        className='flex cursor-pointer items-center justify-between px-4'
+      >
+        <SettingLabel>{_('Override Book Font')}</SettingLabel>
+        <Toggle checked={overrideFont} onChange={() => setOverrideFont(!overrideFont)} />
+      </label>
+
+      <BoxedList title={_('Font Size')}>
+        <NumberInput
+          label={_('Default Font Size')}
+          value={defaultFontSize}
+          onChange={setDefaultFontSize}
+          min={minFontSize}
+          max={120}
+          data-setting-id='settings.font.defaultFontSize'
         />
-      </div>
+        <NumberInput
+          label={_('Minimum Font Size')}
+          value={minFontSize}
+          onChange={setMinFontSize}
+          min={1}
+          max={120}
+          data-setting-id='settings.font.minimumFontSize'
+        />
+      </BoxedList>
 
-      <div className='w-full'>
-        <h2 className='mb-2 font-medium'>{_('Font Size')}</h2>
-        <div className='card border-base-200 border shadow'>
-          <div className='divide-base-200 divide-y'>
-            <NumberInput
-              label={_('Default Font Size')}
-              value={defaultFontSize}
-              onChange={setDefaultFontSize}
-              min={minFontSize}
-              max={120}
-            />
-            <NumberInput
-              label={_('Minimum Font Size')}
-              value={minFontSize}
-              onChange={setMinFontSize}
-              min={1}
-              max={120}
-            />
-          </div>
-        </div>
-      </div>
+      <BoxedList title={_('Font Weight')} data-setting-id='settings.font.fontWeight'>
+        <NumberInput
+          label={_('Font Weight')}
+          value={fontWeight}
+          onChange={setFontWeight}
+          min={100}
+          max={900}
+          step={100}
+        />
+      </BoxedList>
 
-      <div className='w-full'>
-        <h2 className='mb-2 font-medium'>{_('Font Weight')}</h2>
-        <div className='card border-base-200 border shadow'>
-          <div className='divide-base-200 divide-y'>
-            <NumberInput
-              label={_('Font Weight')}
-              value={fontWeight}
-              onChange={setFontWeight}
-              min={100}
-              max={900}
-              step={100}
-            />
-          </div>
-        </div>
-      </div>
+      <BoxedList title={_('Font Family')}>
+        <SettingsRow label={_('Default Font')} data-setting-id='settings.font.defaultFont'>
+          <FontDropdown
+            options={fontFamilyOptions}
+            selected={defaultFont}
+            onSelect={setDefaultFont}
+            onGetFontFamily={handleFontFamilyFont}
+          />
+        </SettingsRow>
+        {(isCJKEnv() || view?.language.isCJK) && (
+          <FontFace
+            family='serif'
+            label={_('CJK Font')}
+            options={CJKFonts}
+            selected={defaultCJKFont}
+            onSelect={setDefaultCJKFont}
+            data-setting-id='settings.font.cjkFont'
+          />
+        )}
+      </BoxedList>
 
-      <div className='w-full'>
-        <h2 className='mb-2 font-medium'>{_('Font Family')}</h2>
-        <div className='card border-base-200 border shadow'>
-          <div className='divide-base-200 divide-y'>
-            <div className='config-item'>
-              <span className=''>{_('Default Font')}</span>
-              <FontDropdown
-                options={fontFamilyOptions}
-                selected={defaultFont}
-                onSelect={setDefaultFont}
-                onGetFontFamily={handleFontFamilyFont}
-              />
-            </div>
+      <BoxedList title={_('Font Face')}>
+        <FontFace
+          family='serif'
+          label={_('Serif Font')}
+          options={[...customFonts, ...SERIF_FONTS.filter(filterNonFreeFonts), ...CJK_SERIF_FONTS]}
+          moreOptions={sysFonts}
+          selected={serifFont}
+          onSelect={setSerifFont}
+          data-setting-id='settings.font.serifFont'
+        />
+        <FontFace
+          family='sans-serif'
+          label={_('Sans-Serif Font')}
+          options={[
+            ...customFonts,
+            ...SANS_SERIF_FONTS.filter(filterNonFreeFonts),
+            ...CJK_SANS_SERIF_FONTS,
+          ]}
+          moreOptions={sysFonts}
+          selected={sansSerifFont}
+          onSelect={setSansSerifFont}
+          data-setting-id='settings.font.sansSerifFont'
+        />
+        <FontFace
+          family='monospace'
+          label={_('Monospace Font')}
+          options={[...customFonts, ...MONOSPACE_FONTS]}
+          moreOptions={sysFonts}
+          selected={monospaceFont}
+          onSelect={setMonospaceFont}
+          data-setting-id='settings.font.monospaceFont'
+        />
+      </BoxedList>
 
-            {(isCJKEnv() || view?.language.isCJK) && (
-              <FontFace
-                className='config-item-top'
-                family='serif'
-                label={_('CJK Font')}
-                options={CJKFonts}
-                selected={defaultCJKFont}
-                onSelect={setDefaultCJKFont}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className='w-full'>
-        <div className='mb-2 flex items-center justify-between'>
-          <h2 className='font-medium'>{_('Font Face')}</h2>
-          <button
-            onClick={handleManageCustomFonts}
-            className='btn btn-ghost btn-xs gap-1 hover:bg-transparent'
-            title={_('Manage Custom Fonts')}
-          >
-            <MdSettings size={iconSize18} />
-          </button>
-        </div>
-        <div className='card border-base-200 border shadow'>
-          <div className='divide-base-200 divide-y'>
-            <FontFace
-              className='config-item-top'
-              family='serif'
-              label={_('Serif Font')}
-              options={[
-                ...customFonts,
-                ...SERIF_FONTS.filter(filterNonFreeFonts),
-                ...CJK_SERIF_FONTS,
-              ]}
-              moreOptions={sysFonts}
-              selected={serifFont}
-              onSelect={setSerifFont}
-            />
-            <FontFace
-              family='sans-serif'
-              label={_('Sans-Serif Font')}
-              options={[
-                ...customFonts,
-                ...SANS_SERIF_FONTS.filter(filterNonFreeFonts),
-                ...CJK_SANS_SERIF_FONTS,
-              ]}
-              moreOptions={sysFonts}
-              selected={sansSerifFont}
-              onSelect={setSansSerifFont}
-            />
-            <FontFace
-              className='config-item-bottom'
-              family='monospace'
-              label={_('Monospace Font')}
-              options={[...customFonts, ...MONOSPACE_FONTS]}
-              moreOptions={sysFonts}
-              selected={monospaceFont}
-              onSelect={setMonospaceFont}
-            />
-          </div>
-        </div>
-      </div>
+      <BoxedList title={_('Custom Fonts')} data-setting-id='settings.font.fonts'>
+        <NavigationRow title={_('Manage Fonts')} onClick={handleManageCustomFonts} />
+      </BoxedList>
     </div>
   );
 };

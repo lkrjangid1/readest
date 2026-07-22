@@ -1,8 +1,8 @@
 'use client';
 
 import clsx from 'clsx';
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEnv } from '@/context/EnvContext';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/hooks/useTheme';
@@ -11,7 +11,7 @@ import { useQuotaStats } from '@/hooks/useQuotaStats';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useUserActions } from '@/hooks/useUserActions';
 import { useAvailablePlans } from '@/hooks/useAvailablePlans';
-import { PlanType } from '@/types/quota';
+import type { PlanType } from '@/types/quota';
 import { navigateToLibrary } from '@/utils/nav';
 import { eventDispatcher } from '@/utils/event';
 import { isTauriAppPlatform } from '@/services/environment';
@@ -22,6 +22,7 @@ import {
   restoreIAPPurchases,
   getSubscriptionSuccessUrl as getIAPSubscriptionSuccessUrl,
 } from '@/libs/payment/iap/client';
+import { isPurchaseProduct } from '@/libs/payment/iap/utils';
 import {
   createStripeCheckoutSession,
   redirectToStripeCheckout,
@@ -29,7 +30,7 @@ import {
   redirectToStripePortal,
   handleStripeCheckoutError,
   getSubscriptionSuccessUrl as getStripeSubscriptionSuccessUrl,
-  StripeAvailablePlan,
+  type StripeAvailablePlan,
 } from '@/libs/payment/stripe/client';
 import LegalLinks from '@/components/LegalLinks';
 import Spinner from '@/components/Spinner';
@@ -38,8 +39,11 @@ import UserInfo from './components/UserInfo';
 import UsageStats from './components/UsageStats';
 import PlansComparison from './components/PlansComparison';
 import AccountActions from './components/AccountActions';
+import StorageManager from './components/StorageManager';
+import SharedLinksSection from './components/SharedLinksSection';
+import { SyncPassphraseSection } from './components/SyncPassphraseSection';
+import { SyncCategoriesSection } from './components/SyncCategoriesSection';
 import Checkout from './components/Checkout';
-import { isPurchaseProduct } from '@/libs/payment/iap/utils';
 
 type CheckoutState = {
   clientSecret: string;
@@ -51,11 +55,17 @@ const ProfilePage = () => {
   const _ = useTranslation();
   const router = useRouter();
   const { appService } = useEnv();
-  const { token, user } = useAuth();
+  const { token, user, refresh } = useAuth();
   const { safeAreaInsets, isRoundedWindow } = useThemeStore();
 
   const [loading, setLoading] = useState(false);
   const [showEmbeddedCheckout, setShowEmbeddedCheckout] = useState(false);
+  const [showStorageManager, setShowStorageManager] = useState(false);
+  const [showSharedLinksManager, setShowSharedLinksManager] = useState(false);
+  const searchParams = useSearchParams();
+  const [showSyncManager, setShowSyncManager] = useState(
+    () => searchParams?.get('section') === 'sync',
+  );
   const [checkoutState, setCheckoutState] = useState<CheckoutState>({
     clientSecret: '',
     sessionId: '',
@@ -65,12 +75,26 @@ const ProfilePage = () => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  useEffect(() => {
+    if (!mounted) return;
+
+    const isAuthenticated = user && token && appService;
+    if (isAuthenticated) return;
+
+    const timer = setTimeout(() => {
+      router.push('/auth?redirect=/library');
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [mounted, user, token, appService, router]);
+
   useTheme({ systemUIVisible: false });
 
-  const { quotas, userPlan = 'free' } = useQuotaStats();
-  const { handleLogout, handleResetPassword, handleConfirmDelete } = useUserActions();
+  const { quotas, userProfilePlan = 'free' } = useQuotaStats();
+  const { handleLogout, handleResetPassword, handleUpdateEmail, handleConfirmDelete } =
+    useUserActions();
 
-  const { availablePlans } = useAvailablePlans({
+  const { availablePlans, iapAvailable } = useAvailablePlans({
     hasIAP: appService?.hasIAP || false,
     onError: useCallback(
       (message: string) => {
@@ -86,6 +110,13 @@ const ProfilePage = () => {
   const handleGoBack = () => {
     if (showEmbeddedCheckout) {
       setShowEmbeddedCheckout(false);
+    } else if (showStorageManager) {
+      setShowStorageManager(false);
+      refresh();
+    } else if (showSharedLinksManager) {
+      setShowSharedLinksManager(false);
+    } else if (showSyncManager) {
+      setShowSyncManager(false);
     } else {
       navigateToLibrary(router);
     }
@@ -101,9 +132,13 @@ const ProfilePage = () => {
         planType,
       );
 
-      const selectedPlan = availablePlans.find(
-        (plan) => plan.productId === productId,
-      )! as StripeAvailablePlan;
+      const foundPlan = availablePlans.find((plan) => plan.productId === productId);
+
+      if (!foundPlan) {
+        throw new Error(`Plan not found for product ID: ${productId}`);
+      }
+
+      const selectedPlan = foundPlan as StripeAvailablePlan;
       const planName = selectedPlan.product?.name || selectedPlan.productName;
 
       const isEmbeddedCheckout = isTauriAppPlatform();
@@ -115,7 +150,7 @@ const ProfilePage = () => {
           sessionId,
         });
       } else {
-        await redirectToStripeCheckout(sessionId, url);
+        await redirectToStripeCheckout(url);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -158,10 +193,14 @@ const ProfilePage = () => {
     try {
       const purchases = await restoreIAPPurchases();
       if (purchases.length > 0) {
-        purchases
+        const restoredSubscriptions = purchases
           .filter((p) => !isPurchaseProduct(p.productId))
           .sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
-        const purchase = purchases[0]!;
+        const purchase = restoredSubscriptions[0];
+
+        if (!purchase) {
+          throw new Error('No subscription found in restored purchases');
+        }
         router.push(getIAPSubscriptionSuccessUrl(purchase));
       } else {
         eventDispatcher.dispatch('toast', {
@@ -199,6 +238,17 @@ const ProfilePage = () => {
     handleConfirmDelete(_('Failed to delete user. Please try again later.'));
   };
 
+  const handleManageStorage = () => {
+    setShowStorageManager(true);
+  };
+
+  const handleManageSharedLinks = () => {
+    setShowSharedLinksManager(true);
+  };
+  const handleManageSync = () => {
+    setShowSyncManager(true);
+  };
+
   if (!mounted) {
     return null;
   }
@@ -218,13 +268,13 @@ const ProfilePage = () => {
   const avatarUrl = user?.user_metadata?.['picture'] || user?.user_metadata?.['avatar_url'];
   const userFullName = user?.user_metadata?.['full_name'] || '-';
   const userEmail = user?.email || '';
-  const planDetails =
-    getPlanDetails(userPlan, availablePlans) || getPlanDetails('free', availablePlans);
+  const userPlanDetails =
+    getPlanDetails(userProfilePlan, availablePlans) || getPlanDetails('free', availablePlans);
 
   return (
     <div
       className={clsx(
-        'bg-base-100 inset-0 h-[100vh] select-none overflow-hidden',
+        'bg-base-100 full-height inset-0 select-none overflow-hidden',
         appService?.hasRoundedWindow && isRoundedWindow && 'window-border rounded-window',
       )}
     >
@@ -258,30 +308,58 @@ const ProfilePage = () => {
                     avatarUrl={avatarUrl}
                     userFullName={userFullName}
                     userEmail={userEmail}
-                    planDetails={planDetails}
+                    planDetails={userPlanDetails}
                   />
 
-                  <UsageStats quotas={quotas} />
+                  {!showStorageManager && !showSharedLinksManager && !showSyncManager && (
+                    <UsageStats quotas={quotas} />
+                  )}
                 </div>
 
-                <div className='flex flex-col gap-y-8 sm:px-6'>
-                  <PlansComparison
-                    availablePlans={availablePlans}
-                    userPlan={userPlan}
-                    onSubscribe={appService.hasIAP ? handleIAPSubscribe : handleStripeSubscribe}
-                  />
-                </div>
+                {showStorageManager ? (
+                  <div className='flex flex-col gap-y-8 px-6'>
+                    <StorageManager />
+                  </div>
+                ) : showSharedLinksManager ? (
+                  <div className='flex flex-col gap-y-8 px-6'>
+                    <SharedLinksSection />
+                  </div>
+                ) : showSyncManager ? (
+                  <div className='flex flex-col gap-y-8 px-6'>
+                    <SyncCategoriesSection />
+                    <SyncPassphraseSection />
+                  </div>
+                ) : (
+                  <>
+                    <div className='flex flex-col gap-y-8 sm:px-6'>
+                      <PlansComparison
+                        availablePlans={availablePlans}
+                        userPlan={userProfilePlan}
+                        onSubscribe={
+                          appService.hasIAP && iapAvailable
+                            ? handleIAPSubscribe
+                            : handleStripeSubscribe
+                        }
+                      />
+                    </div>
+                    <div className='flex flex-col gap-y-8 px-6'>
+                      <AccountActions
+                        userPlan={userProfilePlan}
+                        iapAvailable={iapAvailable}
+                        onLogout={handleLogout}
+                        onResetPassword={handleResetPassword}
+                        onUpdateEmail={handleUpdateEmail}
+                        onConfirmDelete={handleDeleteWithMessage}
+                        onRestorePurchase={handleIAPRestorePurchase}
+                        onManageSubscription={handleManageSubscription}
+                        onManageStorage={handleManageStorage}
+                        onManageSharedLinks={handleManageSharedLinks}
+                        onManageSync={handleManageSync}
+                      />
+                    </div>
+                  </>
+                )}
 
-                <div className='flex flex-col gap-y-8 px-6'>
-                  <AccountActions
-                    userPlan={userPlan}
-                    onLogout={handleLogout}
-                    onResetPassword={handleResetPassword}
-                    onConfirmDelete={handleDeleteWithMessage}
-                    onRestorePurchase={handleIAPRestorePurchase}
-                    onManageSubscription={handleManageSubscription}
-                  />
-                </div>
                 <LegalLinks />
               </div>
             </div>

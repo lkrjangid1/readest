@@ -13,6 +13,8 @@ interface BookCoverProps {
   imageClassName?: string;
   showSpine?: boolean;
   isPreview?: boolean;
+  onImageError?: () => void;
+  onAspectRatioChange?: (ratio: number) => void;
 }
 
 const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
@@ -24,6 +26,8 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
     className,
     imageClassName,
     isPreview,
+    onImageError,
+    onAspectRatioChange,
   }) => {
     const coverRef = useRef<HTMLDivElement>(null);
     const [imageLoaded, setImageLoaded] = useState(false);
@@ -44,16 +48,21 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
       }
     };
 
-    const handleImageLoad = () => {
+    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
       setImageLoaded(true);
       setImageError(false);
       toggleImageVisibility(true);
+      const img = e.currentTarget;
+      if (onAspectRatioChange && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        onAspectRatioChange(img.naturalWidth / img.naturalHeight);
+      }
     };
 
     const handleImageError = () => {
       setImageLoaded(false);
       setImageError(true);
       toggleImageVisibility(false);
+      onImageError?.();
     };
 
     useEffect(() => {
@@ -71,6 +80,8 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
               src={book.metadata?.coverImageUrl || book.coverImageUrl!}
               alt={book.title}
               fill={true}
+              loading='lazy'
+              draggable={false}
               className={clsx('cover-image crop-cover-img object-cover', imageClassName)}
               onLoad={handleImageLoad}
               onError={handleImageError}
@@ -80,19 +91,21 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
             />
           </>
         ) : (
-          <div
-            className={clsx(
-              'flex h-full w-full justify-center',
-              mode === 'grid' ? 'items-end' : 'items-center',
-            )}
-          >
-            <div className='relative inline-block'>
+          <div className={clsx('flex h-full w-full justify-start')}>
+            <div
+              className={clsx(
+                'flex h-full max-h-full items-end',
+                mode === 'grid' ? 'items-end' : 'items-center',
+              )}
+            >
               <Image
                 src={book.metadata?.coverImageUrl || book.coverImageUrl!}
                 alt={book.title}
                 width={0}
                 height={0}
                 sizes='100vw'
+                loading='lazy'
+                draggable={false}
                 className={clsx(
                   'cover-image fit-cover-img h-auto max-h-full w-auto max-w-full shadow-md',
                   imageClassName,
@@ -109,9 +122,10 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
 
         <div
           className={clsx(
-            'fallback-cover invisible absolute inset-0 rounded-none p-2',
+            'fallback-cover invisible absolute inset-0 p-2',
             'text-neutral-content text-center font-serif font-medium',
             isPreview ? 'bg-base-200/50' : 'bg-base-100',
+            imageClassName,
           )}
         >
           <div className='flex h-1/2 items-center justify-center'>
@@ -132,7 +146,7 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
                 isPreview ? 'text-[0.4em]' : mode === 'grid' ? 'text-base' : 'text-xs',
               )}
             >
-              {formatAuthors(book.author)}
+              {formatAuthors(book.author || book.metadata?.author || '')}
             </span>
           </div>
         </div>

@@ -79,6 +79,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
 
   const handleEscape = () => {
     if (notebookNewAnnotation) {
+      // Clearing the selection ends the creation flow; Notebook reacts to that
+      // and tears down the empty placeholder highlight it created (#4791).
       setNotebookNewAnnotation(null);
     }
     if (notebookEditAnnotation) {
@@ -99,7 +101,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ onSave, onEdit }) => {
   const canSave = Boolean(note.trim());
 
   return (
-    <div className='content note-editor-container bg-base-100 mt-2 rounded-md p-2'>
+    <div className='content booknote-item note-editor-container bg-base-100 mt-2 rounded-md p-2'>
       <div className='flex w-full'>
         <TextEditor
           ref={editorRef}

@@ -13,13 +13,23 @@ import { Insets } from '@/types/misc';
 import { EnvConfigType } from '@/services/environment';
 import { FoliateView } from '@/types/view';
 import { DocumentLoader, TOCItem } from '@/libs/document';
-import { updateToc } from '@/utils/toc';
+import {
+  isPseStreamFileName,
+  openPseStreamBook,
+  parsePseStreamFileName,
+} from '@/services/opds/pseStream';
+import type { FileSystem } from '@/types/system';
+import { isFeedBookUrl, parseFeedBookUrl } from '@/services/rss/feedBookUrl';
+import { openFeedBookDoc } from '@/services/rss/feedReader';
+import { BOOK_NAV_VERSION, computeBookNav, hydrateBookNav, updateToc } from '@/services/nav';
 import { formatTitle, getMetadataHash, getPrimaryLanguage } from '@/utils/book';
 import { getBaseFilename } from '@/utils/path';
 import { SUPPORTED_LANGNAMES } from '@/services/constants';
 import { useSettingsStore } from './settingsStore';
-import { useBookDataStore } from './bookDataStore';
+import { BookData, useBookDataStore } from './bookDataStore';
 import { useLibraryStore } from './libraryStore';
+import { clearBookProgress, getBookProgress, setBookProgress } from './readerProgressStore';
+import { uniqueId } from '@/utils/misc';
 
 type FlutterProgressPayload = {
   progress: [number, number];
@@ -161,16 +171,28 @@ interface ViewState {
   /* Unique key for each book view */
   key: string;
   view: FoliateView | null;
+  viewerKey: string;
   isPrimary: boolean;
   loading: boolean;
   inited: boolean;
   error: string | null;
-  progress: BookProgress | null;
+  /* `progress` moved to readerProgressStore — see that file's header for
+     rationale. Use `useBookProgress(key)` for reactive subscription or
+     `getBookProgress(key)` for one-shot reads. */
   ribbonVisible: boolean;
   ttsEnabled: boolean;
+  /* True while an Auto Scroll session (#4998) is engaged for this view;
+     session-only, never persisted. Drives the View menu checkmark. */
+  autoScrollEnabled: boolean;
   syncing: boolean;
   gridInsets: Insets | null;
-  /* View settings for the view: 
+  /* True while the reader is showing a position requested by an external
+     deep link (e.g. ?cfi=...) that the user hasn't yet confirmed by reading.
+     Progress writers (auto-save, cloud sync, kosync) skip while this is true
+     so the user's actual last-read position isn't overwritten by a preview.
+     Cleared on the first user-initiated relocate (page turn / scroll). */
+  previewMode: boolean;
+  /* View settings for the view:
     generally view settings have a hierarchy of global settings < book settings < view settings
     view settings for primary view are saved to book config which is persisted to config file
     omitting settings that are not changed from global settings */
@@ -181,19 +203,28 @@ interface ReaderStore {
   viewStates: { [key: string]: ViewState };
   bookKeys: string[];
   hoveredBookKey: string | null;
+  /* The action tab selected in the mobile bottom bar (font/color/progress);
+     lives here rather than in FooterBar state so the TTS mini player can
+     stack above the expanded panel. Persists across bar hide/show. */
+  bottomBarTab: string;
   setBookKeys: (keys: string[]) => void;
   setHoveredBookKey: (key: string | null) => void;
+  setBottomBarTab: (tab: string) => void;
   setBookmarkRibbonVisibility: (key: string, visible: boolean) => void;
   setTTSEnabled: (key: string, enabled: boolean) => void;
+  setAutoScrollEnabled: (key: string, enabled: boolean) => void;
+  setIsLoading: (key: string, loading: boolean) => void;
   setIsSyncing: (key: string, syncing: boolean) => void;
   setProgress: (
     key: string,
     location: string,
     tocItem: TOCItem,
+    pageItem: BookProgress['pageItem'],
     section: PageInfo,
     pageinfo: PageInfo,
     timeinfo: TimeInfo,
     range: Range,
+    fraction: number,
   ) => void;
   getProgress: (key: string) => BookProgress | null;
   setView: (key: string, view: FoliateView) => void;
@@ -208,20 +239,25 @@ interface ReaderStore {
     id: string,
     key: string,
     isPrimary?: boolean,
+    reload?: boolean,
   ) => Promise<void>;
   clearViewState: (key: string) => void;
   getViewState: (key: string) => ViewState | null;
   getGridInsets: (key: string) => Insets | null;
   setGridInsets: (key: string, insets: Insets | null) => void;
   setViewInited: (key: string, inited: boolean) => void;
+  setPreviewMode: (key: string, previewMode: boolean) => void;
+  recreateViewer: (envConfig: EnvConfigType, key: string) => void;
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
   viewStates: {},
   bookKeys: [],
   hoveredBookKey: null,
+  bottomBarTab: '',
   setBookKeys: (keys: string[]) => set({ bookKeys: keys }),
   setHoveredBookKey: (key: string | null) => set({ hoveredBookKey: key }),
+  setBottomBarTab: (tab: string) => set({ bottomBarTab: tab }),
   getView: (key: string | null) => (key && get().viewStates[key]?.view) || null,
   setView: (key: string, view) =>
     set((state) => ({
@@ -239,6 +275,9 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   },
 
   clearViewState: (key: string) => {
+    // Drop the per-book progress entry alongside the view state so the
+    // standalone progress store doesn't leak across opens/closes.
+    clearBookProgress(key);
     set((state) => {
       const viewStates = { ...state.viewStates };
       delete viewStates[key];
@@ -246,7 +285,13 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     });
   },
   getViewState: (key: string) => get().viewStates[key] || null,
-  initViewState: async (envConfig: EnvConfigType, id: string, key: string, isPrimary = true) => {
+  initViewState: async (
+    envConfig: EnvConfigType,
+    id: string,
+    key: string,
+    isPrimary = true,
+    reload = false,
+  ) => {
     const booksData = useBookDataStore.getState().booksData;
     const bookData = booksData[id];
     set((state) => ({
@@ -255,107 +300,165 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         [key]: {
           key: '',
           view: null,
+          viewerKey: '',
           isPrimary: false,
           loading: true,
           inited: false,
           error: null,
-          progress: null,
           ribbonVisible: false,
           ttsEnabled: false,
+          autoScrollEnabled: false,
           syncing: false,
           gridInsets: null,
+          previewMode: false,
           viewSettings: null,
         },
       },
     }));
     try {
+      const appService = await envConfig.getAppService();
       const { settings } = useSettingsStore.getState();
-      if (!bookData) {
-        const appService = await envConfig.getAppService();
+      // The Flutter host WebView injects the decoded book (bytes + saved
+      // progress) directly via window.__FLUTTER_BOOK_DATA__, so short-circuit
+      // the native library / cloud-sync loading path below.
+      const flutterBookData = (window as any).__FLUTTER_BOOK_DATA__;
+      const isFlutterBook =
+        !!flutterBookData && !!flutterBookData.book && flutterBookData.book.hash === id;
 
-        // Check if this is Flutter mode with pre-loaded book data
-        const flutterBookData = (window as any).__FLUTTER_BOOK_DATA__;
-        if (flutterBookData && flutterBookData.book && flutterBookData.book.hash === id) {
-          const book = flutterBookData.book;
-          const content = {
-            book,
-            file: book.file,
-            config: {
-              updatedAt: Date.now(),
-              progress: book.progress || [1, 1],
-              location: '',
-              viewSettings: {},
-              booknotes: []
-            }
-          } as BookContent;
-
-          const { file, config } = content;
-          console.log('Loading Flutter book', key);
-          const { book: bookDoc } = await new DocumentLoader(file).open();
-          updateToc(bookDoc, config.viewSettings?.sortedTOC ?? false);
-          if (!bookDoc.metadata.title) {
-            bookDoc.metadata.title = getBaseFilename(file.name);
-          }
-          book.sourceTitle = formatTitle(bookDoc.metadata.title);
-
-          const isFixedLayout = FIXED_LAYOUT_FORMATS.has(book.format);
-          useBookDataStore.setState((state) => ({
-            booksData: {
-              ...state.booksData,
-              [id]: { id, book, file, config, bookDoc, isFixedLayout },
-            },
-          }));
+      const { getBookByHash, library } = useLibraryStore.getState();
+      const book = isFlutterBook ? flutterBookData.book : getBookByHash(id);
+      if (!book) {
+        console.error(
+          `Book ${id} not found in library (size=${library.length}); likely the in-memory entry was dropped by a library reload.`,
+        );
+        throw new Error('Book not found');
+      }
+      const isPseStream = !isFlutterBook && !!book.url && isPseStreamFileName(book.url);
+      const isFeed = !isFlutterBook && !!book.url && isFeedBookUrl(book.url);
+      let bookDoc = bookData?.bookDoc;
+      let file: File | null = bookData?.file ?? null;
+      if (!bookDoc || (!isPseStream && !isFeed && !file) || reload) {
+        console.log('Loading book', key);
+        if (isFlutterBook) {
+          file = flutterBookData.book.file as File;
+          const doc = await new DocumentLoader(file).open();
+          bookDoc = doc.book;
+        } else if (isPseStream) {
+          const data = parsePseStreamFileName(book.url!);
+          const doc = await openPseStreamBook(data);
+          bookDoc = doc.book;
+          file = null;
+        } else if (isFeed) {
+          const { feedUrl } = parseFeedBookUrl(book.url!);
+          // AppService publicly exposes the readFile/writeFile/exists surface of FileSystem.
+          const fs = appService as unknown as FileSystem;
+          bookDoc = await openFeedBookDoc(fs, book.hash, feedUrl, book.title);
+          file = null;
         } else {
-          // Original book loading logic
-          let { library } = useLibraryStore.getState();
-          let book = library.find((b) => b.hash === id);
-
-          // If book not found in current library, try refreshing from file system
-          if (!book) {
-            console.log('Book not found in current library, refreshing...');
-            library = await appService.loadLibraryBooks();
-            useLibraryStore.getState().setLibrary(library);
-            book = library.find((b) => b.hash === id);
-
-            if (!book) {
-              throw new Error('Book not found');
-            }
-            console.log('Book found after library refresh:', book.title);
+          const content = (await appService.loadBookContent(book)) as BookContent;
+          file = content.file;
+          let nativeFilePath: string | null = null;
+          try {
+            nativeFilePath = await appService.resolveNativeBookFilePath(book);
+          } catch (err) {
+            console.warn('resolveNativeBookFilePath failed', err);
           }
-          const content = (await appService.loadBookContent(book, settings)) as BookContent;
-          const { file, config } = content;
-          console.log('Loading book', key);
-          const { book: bookDoc } = await new DocumentLoader(file).open();
-          updateToc(bookDoc, config.viewSettings?.sortedTOC ?? false);
-          if (!bookDoc.metadata.title) {
-            bookDoc.metadata.title = getBaseFilename(file.name);
-          }
-          book.sourceTitle = formatTitle(bookDoc.metadata.title);
-          // Correct language codes mistakenly set with language names
-          if (typeof bookDoc.metadata?.language === 'string') {
-            if (bookDoc.metadata.language in SUPPORTED_LANGNAMES) {
-              bookDoc.metadata.language = SUPPORTED_LANGNAMES[bookDoc.metadata.language]!;
-            }
-          }
-          // Set the book's language for formerly imported books, newly imported books have this field set
-          const primaryLanguage = getPrimaryLanguage(bookDoc.metadata.language);
-          book.primaryLanguage = book.primaryLanguage ?? primaryLanguage;
-          book.metadata = book.metadata ?? bookDoc.metadata;
-          // TODO: uncomment this when we can ensure metaHash is correctly generated for all books
-          // book.metaHash = book.metaHash ?? getMetadataHash(bookDoc.metadata);
-          book.metaHash = getMetadataHash(bookDoc.metadata);
-
-          const isFixedLayout = FIXED_LAYOUT_FORMATS.has(book.format);
-          useBookDataStore.setState((state) => ({
-            booksData: {
-              ...state.booksData,
-              [id]: { id, book, file, config, bookDoc, isFixedLayout },
-            },
-          }));
+          const doc = await new DocumentLoader(file, {
+            nativeFilePath: nativeFilePath ?? undefined,
+          }).open();
+          bookDoc = doc.book;
         }
       }
-      const booksData = useBookDataStore.getState().booksData;
-      const config = booksData[id]?.config as BookConfig;
+      const config = isFlutterBook
+        ? ({
+            updatedAt: Date.now(),
+            progress: flutterBookData.book.progress || [1, 1],
+            location: '',
+            viewSettings: {},
+            booknotes: [],
+          } as BookConfig)
+        : await appService.loadBookConfig(book, settings);
+      // Import annotations from third-party readers on first open. Skipped for
+      // Flutter books, which are not backed by the web library / annotation DB.
+      if (!isFlutterBook && bookDoc.metadata.identifier) {
+        const { getAnnotationProviders } = await import('@/services/annotation');
+        for (const provider of getAnnotationProviders()) {
+          if (provider.isAvailable(appService)) {
+            const merged = await provider.importAnnotations(
+              appService,
+              bookDoc.metadata.identifier,
+              config,
+            );
+            if (merged !== config) {
+              Object.assign(config, merged);
+              await appService.saveBookConfig(book, config, settings);
+            }
+          }
+        }
+      }
+      // Filter out invalid booknotes
+      config.booknotes = config.booknotes?.filter((booknote) => booknote.cfi) ?? [];
+      // Load cached book navigation (TOC + section fragments) or compute and persist.
+      // Flutter books aren't backed by the web nav cache store, so compute inline only.
+      if (!isFlutterBook && book.format === 'EPUB' && bookDoc.rendition?.layout !== 'pre-paginated') {
+        const cachedNav = await appService.loadBookNav(book);
+        if (cachedNav?.version === BOOK_NAV_VERSION && process.env.NODE_ENV === 'production') {
+          hydrateBookNav(bookDoc, cachedNav);
+        } else {
+          const freshNav = await computeBookNav(bookDoc);
+          hydrateBookNav(bookDoc, freshNav);
+          try {
+            await appService.saveBookNav(book, freshNav);
+          } catch (e) {
+            console.warn('Failed to persist book nav cache:', e);
+          }
+        }
+      }
+      await updateToc(
+        bookDoc,
+        config.viewSettings?.sortedTOC ?? false,
+        config.viewSettings?.convertChineseVariant ?? 'none',
+      );
+      if (!bookDoc.metadata.title && file) {
+        bookDoc.metadata.title = getBaseFilename(file.name);
+      }
+      book.sourceTitle = formatTitle(bookDoc.metadata.title);
+      // Correct language codes mistakenly set with language names
+      if (typeof bookDoc.metadata?.language === 'string') {
+        if (bookDoc.metadata.language in SUPPORTED_LANGNAMES) {
+          bookDoc.metadata.language = SUPPORTED_LANGNAMES[bookDoc.metadata.language]!;
+        }
+      }
+      // Set the book's language for formerly imported books, newly imported books have this field set
+      const primaryLanguage = getPrimaryLanguage(bookDoc.metadata.language);
+      book.primaryLanguage = book.primaryLanguage ?? primaryLanguage;
+      book.metadata = book.metadata ?? bookDoc.metadata;
+
+      // Update series info from metadata if available and not already set on the book
+      if (bookDoc.metadata.belongsTo?.series) {
+        const belongsTo = bookDoc.metadata.belongsTo.series;
+        const series = Array.isArray(belongsTo) ? belongsTo[0] : belongsTo;
+        if (series) {
+          book.metadata.series = book.metadata.series ?? formatTitle(series.name);
+          book.metadata.seriesIndex =
+            book.metadata.seriesIndex ?? parseFloat(series.position || '0');
+          book.metadata.seriesTotal =
+            book.metadata.seriesTotal ?? (series.total ? parseInt(series.total, 10) : undefined);
+        }
+      }
+      // TODO: uncomment this when we can ensure metaHash is correctly generated for all books
+      // book.metaHash = book.metaHash ?? getMetadataHash(bookDoc.metadata);
+      book.metaHash = getMetadataHash(bookDoc.metadata);
+
+      const isFixedLayout =
+        bookDoc.rendition?.layout === 'pre-paginated' || FIXED_LAYOUT_FORMATS.has(book.format);
+      const newBookData: BookData = { id, book, file, config, bookDoc, isFixedLayout };
+      useBookDataStore.setState((state) => ({
+        booksData: {
+          ...state.booksData,
+          [id]: newBookData,
+        },
+      }));
       const configViewSettings = config.viewSettings!;
       const globalViewSettings = settings.globalViewSettings;
       set((state) => ({
@@ -365,15 +468,17 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             ...state.viewStates[key],
             key,
             view: null,
+            viewerKey: `${key}-${uniqueId()}`,
             isPrimary,
             loading: false,
             inited: false,
             error: null,
-            progress: null,
             ribbonVisible: false,
             ttsEnabled: false,
+            autoScrollEnabled: false,
             syncing: false,
             gridInsets: null,
+            previewMode: false,
             viewSettings: { ...globalViewSettings, ...configViewSettings },
           },
         },
@@ -387,19 +492,22 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
             ...state.viewStates[key],
             key: '',
             view: null,
+            viewerKey: '',
             isPrimary: false,
             loading: false,
             inited: false,
             error: 'Failed to load book.',
-            progress: null,
             ribbonVisible: false,
             ttsEnabled: false,
+            autoScrollEnabled: false,
             syncing: false,
             gridInsets: null,
+            previewMode: false,
             viewSettings: null,
           },
         },
       }));
+      throw error;
     }
   },
   getViewSettings: (key: string) => get().viewStates[key]?.viewSettings || null,
@@ -434,78 +542,93 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       },
     }));
   },
-  getProgress: (key: string) => get().viewStates[key]?.progress || null,
+  // Delegates to the standalone readerProgressStore so that progress reads
+  // do not subscribe the caller to readerStore. Most call sites need a
+  // one-shot read (event handlers, useEffect bodies). Components that
+  // genuinely depend on progress for rendering should subscribe via the
+  // `useBookProgress(key)` hook exported from readerProgressStore instead.
+  getProgress: (key: string) => getBookProgress(key),
   setProgress: (
     key: string,
     location: string,
     tocItem: TOCItem,
+    pageItem: BookProgress['pageItem'],
     section: PageInfo,
     pageinfo: PageInfo,
     timeinfo: TimeInfo,
     range: Range,
-  ) =>
-    set((state) => {
-      const id = key.split('-')[0]!;
-      const bookData = useBookDataStore.getState().booksData[id];
-      const viewState = state.viewStates[key];
-      if (!viewState || !bookData) return state;
+    fraction: number,
+  ) => {
+    const id = key.split('-')[0]!;
+    const bookData = useBookDataStore.getState().booksData[id];
+    const viewState = get().viewStates[key];
+    if (!viewState || !bookData) return;
 
-      const pagePressInfo = bookData.isFixedLayout ? section : pageinfo;
-      const progress: [number, number] = [pagePressInfo.current + 1, pagePressInfo.total];
+    const pageInfo = bookData.isFixedLayout ? section : pageinfo;
+    const progress: [number, number] = [pageInfo.current + 1, pageInfo.total];
+    const progressPercentage = Math.round((progress[0] / progress[1]) * 100);
 
-      // Update library book progress
-      const { library, setLibrary } = useLibraryStore.getState();
-      const bookIndex = library.findIndex((b) => b.hash === id);
-      if (bookIndex !== -1) {
-        const updatedLibrary = [...library];
-        const existingBook = updatedLibrary[bookIndex]!;
-        updatedLibrary[bookIndex] = {
-          ...existingBook,
-          progress,
-          updatedAt: Date.now(),
-        };
-        setLibrary(updatedLibrary);
+    // Lightweight library update — O(1) lookup, no array copy, no refreshGroups
+    const { getBookByHash, updateBookProgress } = useLibraryStore.getState();
+    const existingBook = getBookByHash(id);
+    if (existingBook) {
+      let newReadingStatus = existingBook.readingStatus;
+      if (existingBook.readingStatus === 'unread') {
+        newReadingStatus = undefined;
       }
+      if (progressPercentage >= 100 && existingBook.readingStatus !== 'finished') {
+        newReadingStatus = 'finished';
+      }
+      updateBookProgress(id, progress, newReadingStatus);
+    }
 
-      const oldConfig = bookData.config;
-      const newConfig = {
-        ...bookData.config,
-        progress,
-        location,
-      } as BookConfig;
-
-      useBookDataStore.setState((state) => ({
-        booksData: {
-          ...state.booksData,
-          [id]: {
-            ...bookData,
-            config: viewState.isPrimary ? newConfig : oldConfig,
-          },
-        },
-      }));
-
-      notifyFlutterAboutProgress(progress, bookData.book?.filePath);
-
-      return {
-        viewStates: {
-          ...state.viewStates,
-          [key]: {
-            ...viewState,
-            progress: {
-              ...viewState.progress,
-              location,
-              sectionHref: tocItem?.href,
-              sectionLabel: tocItem?.label,
-              sectionId: tocItem?.id,
-              section,
-              pageinfo,
-              timeinfo,
-              range,
+    // Only the primary view persists progress into the shared bookData
+    // config — secondary views in a parallel layout shouldn't overwrite
+    // it. Skip the bookDataStore write entirely when not primary to spare
+    // its subscribers a re-render.
+    if (viewState.isPrimary) {
+      useBookDataStore.setState((state) => {
+        const existing = state.booksData[id];
+        if (!existing) return state;
+        return {
+          booksData: {
+            ...state.booksData,
+            [id]: {
+              ...existing,
+              config: {
+                ...existing.config,
+                progress,
+                location,
+              } as BookConfig,
             },
           },
-        },
-      };
-    }),
+        };
+      });
+    }
+
+    // Mirror the latest progress to the Flutter host so it can persist it
+    // outside the WebView (ReadingProgressService / Larse).
+    notifyFlutterAboutProgress(progress, bookData.book?.filePath);
+
+    // Write progress to the standalone store. This is the only setState on
+    // the hot swipe path that the previous implementation routed through
+    // the (much bigger) readerStore — the split here is the whole point of
+    // the refactor: components subscribing to `useReaderStore()` without a
+    // selector will no longer re-render per page turn.
+    setBookProgress(key, {
+      location,
+      sectionHref: tocItem?.href,
+      sectionLabel: tocItem?.label,
+      pageItem,
+      section,
+      pageinfo,
+      timeinfo,
+      fraction,
+      index: section.current,
+      range,
+      page: pageInfo.current + 1,
+    } as BookProgress);
+  },
   setBookmarkRibbonVisibility: (key: string, visible: boolean) =>
     set((state) => ({
       viewStates: {
@@ -524,6 +647,28 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         [key]: {
           ...state.viewStates[key]!,
           ttsEnabled: enabled,
+        },
+      },
+    })),
+
+  setAutoScrollEnabled: (key: string, enabled: boolean) =>
+    set((state) => ({
+      viewStates: {
+        ...state.viewStates,
+        [key]: {
+          ...state.viewStates[key]!,
+          autoScrollEnabled: enabled,
+        },
+      },
+    })),
+
+  setIsLoading: (key: string, loading: boolean) =>
+    set((state) => ({
+      viewStates: {
+        ...state.viewStates,
+        [key]: {
+          ...state.viewStates[key]!,
+          loading,
         },
       },
     })),
@@ -562,4 +707,32 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
         },
       },
     })),
+
+  setPreviewMode: (key: string, previewMode: boolean) =>
+    set((state) => ({
+      viewStates: {
+        ...state.viewStates,
+        [key]: {
+          ...state.viewStates[key]!,
+          previewMode,
+        },
+      },
+    })),
+
+  recreateViewer: (envConfig: EnvConfigType, key: string) => {
+    const id = key.split('-')[0]!;
+    get()
+      .initViewState(envConfig, id, key, true, true)
+      .then(() => {
+        set((state) => ({
+          viewStates: {
+            ...state.viewStates,
+            [key]: {
+              ...state.viewStates[key]!,
+              viewerKey: `${key}-${uniqueId()}`,
+            },
+          },
+        }));
+      });
+  },
 }));

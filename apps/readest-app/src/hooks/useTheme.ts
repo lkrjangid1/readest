@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useSettingsStore } from '@/store/settingsStore';
+import { useSafeAreaInsets } from './useSafeAreaInsets';
 import { themes, applyCustomTheme, Palette } from '@/styles/themes';
 import { getStatusBarHeight, setSystemUIVisibility } from '@/utils/bridge';
 import { getOSPlatform } from '@/utils/misc';
@@ -18,6 +19,10 @@ export const useTheme = ({
 }: UseThemeProps = {}) => {
   const { appService } = useEnv();
   const { settings } = useSettingsStore();
+  const isEink = settings?.globalViewSettings?.isEink;
+  const isColorEink = settings?.globalViewSettings?.isColorEink;
+  const isBwEink = isEink && !isColorEink;
+  const highlightOpacity = settings?.globalViewSettings?.highlightOpacity ?? 0.4;
   const {
     themeColor,
     isDarkMode,
@@ -28,6 +33,7 @@ export const useTheme = ({
     systemUIAlwaysHidden,
     setSystemUIAlwaysHidden,
   } = useThemeStore();
+  const { onUpdateInsets } = useSafeAreaInsets();
 
   const useFallbackColors = useRef(false);
 
@@ -39,22 +45,30 @@ export const useTheme = ({
           setStatusBarHeight(res.height / window.devicePixelRatio);
         }
       });
+      handleSystemUIVisibility(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appService?.isAndroidApp]);
 
-  const handleSystemUIVisibility = useCallback(() => {
-    if (!appService?.isMobileApp) return;
+  const handleSystemUIVisibility = useCallback(
+    (updateInsets = false) => {
+      if (!appService?.isMobileApp) return;
 
-    const visible = systemUIVisible && !systemUIAlwaysHidden;
-    if (visible) {
-      showSystemUI();
-    } else {
-      dismissSystemUI();
-    }
-    setSystemUIVisibility({ visible, darkMode: isDarkMode });
+      const visible = !!(systemUIVisible && !systemUIAlwaysHidden);
+      if (visible) {
+        showSystemUI();
+      } else {
+        dismissSystemUI();
+      }
+      setSystemUIVisibility({ visible, darkMode: isDarkMode }).then(() => {
+        if (updateInsets) {
+          onUpdateInsets();
+        }
+      });
+    },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appService, isDarkMode, systemUIVisible]);
+    [appService, isDarkMode, systemUIVisible],
+  );
 
   useEffect(() => {
     if (appService?.isMobileApp) {
@@ -117,13 +131,18 @@ export const useTheme = ({
     const colorScheme = isDarkMode ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', `${themeColor}-${colorScheme}`);
     document.documentElement.style.setProperty('color-scheme', colorScheme);
+    document.documentElement.style.setProperty('--scroll-bg-opacity', isBwEink ? '1.0' : '0.5');
+    document.documentElement.style.setProperty(
+      '--overlayer-highlight-opacity',
+      isBwEink ? '1.0' : String(highlightOpacity),
+    );
     document.documentElement.style.setProperty(
       '--overlayer-highlight-blend-mode',
-      isDarkMode ? 'lighten' : 'normal',
+      isBwEink ? 'difference' : isDarkMode ? 'screen' : 'multiply',
     );
     document.documentElement.style.setProperty(
       '--bg-texture-blend-mode',
       isDarkMode ? 'lighten' : 'multiply',
     );
-  }, [themeColor, isDarkMode]);
+  }, [themeColor, isDarkMode, isBwEink, highlightOpacity]);
 };

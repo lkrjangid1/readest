@@ -38,10 +38,10 @@ const getAdditionalBasicFontLinks = () => `
 const getAdditionalCJKFontLinks = () => `
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/misans-webfont@1.0.4/misans-l3/misans-l3/result.min.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lxgw-wenkai-screen-web/1.520.0/lxgwwenkaigbscreen/result.css" crossorigin="anonymous" />
-  <link rel='stylesheet' href='https://chinese-fonts-cdn.netlify.app/packages/hwmct/dist/%E6%B1%87%E6%96%87%E6%98%8E%E6%9C%9D%E4%BD%93/result.css' crossorigin="anonymous" />
-  <link rel='stylesheet' href='https://chinese-fonts-cdn.netlify.app/packages/jhlst/dist/%E4%BA%AC%E8%8F%AF%E8%80%81%E5%AE%8B%E4%BD%93v2_002/result.css' crossorigin="anonymous" />
-  <link rel='stylesheet' href='https://chinese-fonts-cdn.netlify.app/packages/syst/dist/SourceHanSerifCN/result.css' crossorigin="anonymous" />
-  <link rel='stylesheet' href='https://chinese-fonts-cdn.netlify.app/packages/GuanKiapTsingKhai/dist/GuanKiapTsingKhai-T/result.css' crossorigin="anonymous" />
+  <link rel='stylesheet' href='https://storage.readest.com/public/font/dist/Huiwen-MinchoGBK/result.css' crossorigin="anonymous" />
+  <link rel='stylesheet' href='https://storage.readest.com/public/font/dist/KingHwa_OldSong/result.css' crossorigin="anonymous" />
+  <link rel='stylesheet' href='https://storage.readest.com/public/font/dist/Source%20Han%20Serif%20CN/result.css' crossorigin="anonymous" />
+  <link rel='stylesheet' href='https://storage.readest.com/public/font/dist/GuanKiapTsingKhai-T/result.css' crossorigin="anonymous" />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?${cjkGoogleFonts
     .map(
       ({ family, weights }) =>
@@ -93,21 +93,28 @@ const getAdditionalCJKFontFaces = () => `
 }
 `;
 
-export const mountAdditionalFonts = (document: Document, isCJK = false) => {
+export const mountAdditionalFonts = async (document: Document, isCJK = false) => {
   const mountCJKFonts = isCJK || isCJKEnv();
-  let links = getAdditionalBasicFontLinks();
-  if (mountCJKFonts) {
-    const style = document.createElement('style');
-    style.textContent = getAdditionalCJKFontFaces();
-    document.head.appendChild(style);
 
+  // Mount font stylesheets and @font-face rules
+  let links = getAdditionalBasicFontLinks();
+  let fontFaces = '';
+
+  if (mountCJKFonts) {
+    fontFaces = getAdditionalCJKFontFaces();
     links = `${links}\n${getAdditionalCJKFontLinks()}`;
   }
 
-  const parser = new DOMParser();
-  const parsedDocument = parser.parseFromString(links, 'text/html');
+  if (fontFaces) {
+    const style = document.createElement('style');
+    style.textContent = fontFaces;
+    document.head.appendChild(style);
+  }
 
-  Array.from(parsedDocument.head.children).forEach((child) => {
+  const parser = new DOMParser();
+  const linksDocument = parser.parseFromString(links, 'text/html');
+
+  Array.from(linksDocument.head.children).forEach((child) => {
     if (child.tagName === 'LINK') {
       const link = document.createElement('link');
       link.rel = child.getAttribute('rel') || '';
@@ -129,6 +136,33 @@ export interface CustomFont {
   style?: string;
   weight?: number;
   variable?: boolean;
+
+  /**
+   * Cross-device content hash. Set on imports new enough to participate
+   * in replica sync (`partialMD5 + byteSize + filename`). Legacy fonts
+   * (created before replica sync) leave this undefined and never publish
+   * — re-import to enable cloud sync.
+   */
+  contentId?: string;
+  /**
+   * Per-font directory name relative to the `Fonts` base. New imports
+   * land at `<bundleDir>/<filename>`; legacy imports keep their flat
+   * `<filename>` path with bundleDir undefined.
+   */
+  bundleDir?: string;
+  /** File size in bytes — used by the replica manifest, optional for legacy. */
+  byteSize?: number;
+  /**
+   * On a remote-pulled placeholder, set to true until the binary download
+   * lands. The transfer-complete handler clears it via the font store's
+   * markAvailable hook.
+   */
+  unavailable?: boolean;
+  /**
+   * Reincarnation token — opaque value that revives a tombstoned remote
+   * row. Mirrors the dictionary mechanism.
+   */
+  reincarnation?: string;
 
   downloadedAt?: number;
   deletedAt?: number;
@@ -209,13 +243,15 @@ export function createCustomFont(
   options?: Partial<Omit<CustomFont, 'id' | 'path'>>,
 ): CustomFont {
   const name = options?.name || getFontName(path);
+  // Spread options first so replica-sync fields (contentId, bundleDir,
+  // byteSize) flow through from the import path. The earlier hand-
+  // picked field list silently dropped them, leaving font.contentId
+  // undefined → publishFontUpsert short-circuited on `!contentId` →
+  // newly imported fonts never published their replica row.
   return {
+    ...options,
     id: getFontId(name),
     name,
-    family: options?.family,
-    style: options?.style,
-    weight: options?.weight,
-    variable: options?.variable,
     path,
   };
 }

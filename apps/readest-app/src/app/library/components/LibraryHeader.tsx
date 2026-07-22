@@ -1,20 +1,19 @@
 import clsx from 'clsx';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { FaSearch } from 'react-icons/fa';
 import { PiPlus } from 'react-icons/pi';
-import { PiSelectionAllDuotone } from 'react-icons/pi';
+import { PiSelectionAll, PiSelectionAllFill } from 'react-icons/pi';
 import { PiDotsThreeCircle } from 'react-icons/pi';
-import { MdOutlineMenu, MdArrowBackIosNew } from 'react-icons/md';
+import { MdOutlineMenu } from 'react-icons/md';
 import { IoMdCloseCircle } from 'react-icons/io';
 
 import { useEnv } from '@/context/EnvContext';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLibraryStore } from '@/store/libraryStore';
+import { useTrafficLight } from '@/hooks/useTrafficLight';
 import { useResponsiveSize } from '@/hooks/useResponsiveSize';
-import { useTrafficLightStore } from '@/store/trafficLightStore';
-import { navigateToLibrary } from '@/utils/nav';
 import { debounce } from '@/utils/debounce';
 import useShortcuts from '@/hooks/useShortcuts';
 import WindowButtons from '@/components/WindowButtons';
@@ -26,7 +25,12 @@ import ViewMenu from './ViewMenu';
 interface LibraryHeaderProps {
   isSelectMode: boolean;
   isSelectAll: boolean;
-  onImportBooks: () => void;
+  onPullLibrary: () => void;
+  onImportBooksFromFiles: () => void;
+  onImportBooksFromDirectory?: () => void;
+  onImportBookFromUrl?: () => void;
+  onOpenCatalogManager: () => void;
+  onOpenFeeds: () => void;
   onToggleSelectMode: () => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
@@ -35,7 +39,12 @@ interface LibraryHeaderProps {
 const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   isSelectMode,
   isSelectAll,
-  onImportBooks,
+  onPullLibrary,
+  onImportBooksFromFiles,
+  onImportBooksFromDirectory,
+  onImportBookFromUrl,
+  onOpenCatalogManager,
+  onOpenFeeds,
   onToggleSelectMode,
   onSelectAll,
   onDeselectAll,
@@ -46,18 +55,11 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   const { appService } = useEnv();
   const { systemUIVisible, statusBarHeight } = useThemeStore();
   const { currentBookshelf } = useLibraryStore();
-  const {
-    isTrafficLightVisible,
-    initializeTrafficLightStore,
-    initializeTrafficLightListeners,
-    setTrafficLightVisibility,
-    cleanupTrafficLightListeners,
-  } = useTrafficLightStore();
   const [searchQuery, setSearchQuery] = useState(searchParams?.get('q') ?? '');
 
   const headerRef = useRef<HTMLDivElement>(null);
+  const { isTrafficLightVisible } = useTrafficLight(headerRef);
   const iconSize18 = useResponsiveSize(18);
-  const iconSize20 = useResponsiveSize(20);
   const { safeAreaInsets: insets } = useThemeStore();
 
   useShortcuts({
@@ -84,20 +86,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
     debouncedUpdateQueryParam(newQuery);
   };
 
-  useEffect(() => {
-    if (!appService?.hasTrafficLight) return;
-
-    initializeTrafficLightStore(appService);
-    initializeTrafficLightListeners();
-    setTrafficLightVisibility(true);
-    return () => {
-      cleanupTrafficLightListeners();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appService?.hasTrafficLight]);
-
   const windowButtonVisible = appService?.hasWindowBar && !isTrafficLightVisible;
-  const isInGroupView = !!searchParams?.get('group');
   const currentBooksCount = currentBookshelf.reduce(
     (acc, item) => acc + ('books' in item ? item.books.length : 1),
     0,
@@ -105,11 +94,13 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
 
   if (!insets) return null;
 
+  const isMobile = appService?.isMobile || window.innerWidth <= 640;
+
   return (
     <div
       ref={headerRef}
       className={clsx(
-        'titlebar z-10 flex h-[52px] w-full items-center py-2 pr-4 sm:h-[48px]',
+        'titlebar z-10 flex h-[52px] w-full items-center py-2 pr-4 sm:h-[44px]',
         windowButtonVisible ? 'sm:pr-4' : 'sm:pr-6',
         isTrafficLightVisible ? 'pl-16' : 'pl-0 sm:pl-2',
       )}
@@ -121,20 +112,8 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
     >
       <div className='flex w-full items-center justify-between space-x-6 sm:space-x-12'>
         <div className='exclude-title-bar-mousedown relative flex w-full items-center pl-4'>
-          {isInGroupView && (
-            <button
-              onClick={() => {
-                navigateToLibrary(router);
-              }}
-              className='ml-[-6px] mr-4 flex h-7 min-h-7 w-7 items-center p-0'
-            >
-              <div className='lg:tooltip lg:tooltip-bottom' data-tip={_('Go Back')}>
-                <MdArrowBackIosNew size={iconSize20} />
-              </div>
-            </button>
-          )}
           <div className='relative flex h-9 w-full items-center sm:h-7'>
-            <span className='absolute left-3 text-gray-500'>
+            <span className='text-base-content/50 absolute ps-3'>
               <FaSearch className='h-4 w-4' />
             </span>
             <input
@@ -150,13 +129,15 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
               onChange={handleSearchChange}
               spellCheck='false'
               className={clsx(
-                'input rounded-badge bg-base-300/45 h-9 w-full pl-10 pr-10 sm:h-7',
+                'search-input input h-9 w-full rounded-full pr-[30%] ps-10 sm:h-7',
+                'bg-base-300/45 border-0',
                 'font-sans text-sm font-light',
-                'border-none focus:outline-none focus:ring-0',
+                'placeholder:text-base-content/50 truncate',
+                'focus:outline-none focus:ring-0',
               )}
             />
           </div>
-          <div className='absolute right-4 flex items-center space-x-2 text-gray-500 sm:space-x-4'>
+          <div className='text-base-content/50 absolute right-4 flex items-center space-x-2 sm:space-x-4'>
             {searchQuery && (
               <button
                 type='button'
@@ -164,7 +145,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
                   setSearchQuery('');
                   debouncedUpdateQueryParam('');
                 }}
-                className='pe-1 text-gray-400 hover:text-gray-600'
+                className='text-base-content/40 hover:text-base-content/60 pe-1'
                 aria-label={_('Clear Search')}
               >
                 <IoMdCloseCircle className='h-4 w-4' />
@@ -174,25 +155,31 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
             <Dropdown
               label={_('Import Books')}
               className={clsx(
-                'exclude-title-bar-mousedown dropdown-bottom flex h-6 cursor-pointer justify-center',
-                appService?.isMobile ? 'dropdown-end' : 'dropdown-center',
+                'exclude-title-bar-mousedown dropdown-bottom dropdown-center cursor-pointer',
               )}
-              buttonClassName='p-0 h-6 min-h-6 w-6 flex items-center justify-center'
+              buttonClassName='p-0 h-6 min-h-6 w-6 flex touch-target items-center justify-center !bg-transparent'
               toggleButton={<PiPlus role='none' className='m-0.5 h-5 w-5' />}
             >
-              <ImportMenu onImportBooks={onImportBooks} />
+              <ImportMenu
+                onImportBooksFromFiles={onImportBooksFromFiles}
+                onImportBooksFromDirectory={onImportBooksFromDirectory}
+                onImportBookFromUrl={onImportBookFromUrl}
+                onOpenCatalogManager={onOpenCatalogManager}
+                onOpenFeeds={onOpenFeeds}
+              />
             </Dropdown>
-            {appService?.isMobile ? null : (
+            {isMobile ? null : (
               <button
                 onClick={onToggleSelectMode}
                 aria-label={_('Select Books')}
                 title={_('Select Books')}
                 className='h-6'
               >
-                <PiSelectionAllDuotone
-                  role='button'
-                  className={`h-6 w-6 ${isSelectMode ? 'fill-gray-400' : 'fill-gray-500'}`}
-                />
+                {isSelectMode ? (
+                  <PiSelectionAllFill role='button' className='text-base-content/60 h-6 w-6' />
+                ) : (
+                  <PiSelectionAll role='button' className='text-base-content/60 h-6 w-6' />
+                )}
               </button>
             )}
           </div>
@@ -209,7 +196,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
               className='btn btn-ghost text-base-content/85 h-8 min-h-8 w-[72px] p-0 sm:w-[80px]'
               aria-label={isSelectAll ? _('Deselect') : _('Select All')}
             >
-              <span className='font-sans text-base font-normal sm:text-sm'>
+              <span className='font-sans text-base font-normal sm:text-sm whitespace-nowrap truncate'>
                 {isSelectAll ? _('Deselect') : _('Select All')}
               </span>
             </button>
@@ -230,7 +217,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
               buttonClassName='btn btn-ghost h-8 min-h-8 w-8 p-0'
               toggleButton={<MdOutlineMenu role='none' size={iconSize18} />}
             >
-              <SettingsMenu />
+              <SettingsMenu onPullLibrary={onPullLibrary} />
             </Dropdown>
             {appService?.hasWindowBar && (
               <WindowButtons

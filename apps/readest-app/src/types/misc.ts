@@ -4,3 +4,8 @@ export type Insets = {
   left: number;
   right: number;
 };
+
+export type LocaleWithTextInfo = Intl.Locale & {
+  getTextInfo?: () => { direction: string };
+  textInfo?: { direction: string };
+};

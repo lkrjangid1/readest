@@ -1,6 +1,8 @@
-use tauri::{command, AppHandle, Runtime};
+use std::path::PathBuf;
+use tauri::{command, AppHandle, Runtime, State};
 
 use crate::models::*;
+use crate::DirectoryCallbackState;
 use crate::NativeBridgeExt;
 use crate::Result;
 
@@ -29,11 +31,27 @@ pub(crate) async fn copy_uri_to_path<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn save_image_to_gallery<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SaveImageToGalleryRequest,
+) -> Result<SaveImageToGalleryResponse> {
+    app.native_bridge().save_image_to_gallery(payload)
+}
+
+#[command]
 pub(crate) async fn use_background_audio<R: Runtime>(
     app: AppHandle<R>,
     payload: UseBackgroundAudioRequest,
 ) -> Result<()> {
     app.native_bridge().use_background_audio(payload)
+}
+
+#[command]
+pub(crate) async fn set_text_selection_suppressed<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SetTextSelectionSuppressedRequest,
+) -> Result<()> {
+    app.native_bridge().set_text_selection_suppressed(payload)
 }
 
 #[command]
@@ -80,6 +98,13 @@ pub(crate) async fn lock_screen_orientation<R: Runtime>(
     payload: LockScreenOrientationRequest,
 ) -> Result<()> {
     app.native_bridge().lock_screen_orientation(payload)
+}
+
+#[command]
+pub(crate) async fn iap_is_available<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<IAPIsAvailableResponse> {
+    app.native_bridge().iap_is_available()
 }
 
 #[command]
@@ -150,8 +175,140 @@ pub(crate) async fn get_external_sdcard_path<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn open_external_url<R: Runtime>(
+    app: AppHandle<R>,
+    payload: OpenExternalUrlRequest,
+) -> Result<OpenExternalUrlResponse> {
+    app.native_bridge().open_external_url(payload)
+}
+
+/// See [`ShowLookupPopoverRequest`] in `models.rs` for platform-by-
+/// platform behavior. The mobile bridge dispatches into the iOS /
+/// Android plugin; desktop returns `UnsupportedPlatformError` and the
+/// TS layer keeps the macOS-specific path going through the
+/// top-level `show_lookup_popover` Tauri command (AppKit HUD).
+#[command]
+pub(crate) async fn show_lookup_popover<R: Runtime>(
+    app: AppHandle<R>,
+    payload: ShowLookupPopoverRequest,
+) -> Result<ShowLookupPopoverResponse> {
+    app.native_bridge().show_lookup_popover(payload)
+}
+
+#[command]
+pub(crate) async fn select_directory<R: Runtime>(
+    app: AppHandle<R>,
+    callback_state: State<'_, DirectoryCallbackState<R>>,
+) -> Result<SelectDirectoryResponse> {
+    let result = app.native_bridge().select_directory()?;
+
+    if let Some(dir_path) = &result.path {
+        let path = PathBuf::from(dir_path);
+
+        if let Ok(callback_guard) = callback_state.callback.lock() {
+            if let Some(callback) = callback_guard.as_ref() {
+                callback(&app, &path);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+#[command]
+pub(crate) async fn get_storefront_region_code<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<GetStorefrontRegionCodeResponse> {
+    app.native_bridge().get_storefront_region_code()
+}
+
+#[command]
 pub(crate) async fn request_manage_storage_permission<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<RequestManageStoragePermissionResponse> {
     app.native_bridge().request_manage_storage_permission()
+}
+
+#[command]
+pub(crate) async fn set_sync_passphrase<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SetSyncPassphraseRequest,
+) -> Result<SyncPassphraseResponse> {
+    app.native_bridge().set_sync_passphrase(payload)
+}
+
+#[command]
+pub(crate) async fn get_sync_passphrase<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<GetSyncPassphraseResponse> {
+    app.native_bridge().get_sync_passphrase()
+}
+
+#[command]
+pub(crate) async fn clear_sync_passphrase<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<SyncPassphraseResponse> {
+    app.native_bridge().clear_sync_passphrase()
+}
+
+#[command]
+pub(crate) async fn is_sync_keychain_available<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<SyncKeychainAvailableResponse> {
+    app.native_bridge().is_sync_keychain_available()
+}
+
+#[command]
+pub(crate) async fn set_secure_item<R: Runtime>(
+    app: AppHandle<R>,
+    payload: SetSecureItemRequest,
+) -> Result<SecureItemResponse> {
+    app.native_bridge().set_secure_item(payload)
+}
+
+#[command]
+pub(crate) async fn get_secure_item<R: Runtime>(
+    app: AppHandle<R>,
+    payload: GetSecureItemRequest,
+) -> Result<GetSecureItemResponse> {
+    app.native_bridge().get_secure_item(payload)
+}
+
+#[command]
+pub(crate) async fn clear_secure_item<R: Runtime>(
+    app: AppHandle<R>,
+    payload: GetSecureItemRequest,
+) -> Result<SecureItemResponse> {
+    app.native_bridge().clear_secure_item(payload)
+}
+
+#[command]
+pub(crate) async fn refresh_eink_screen<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<RefreshEinkScreenResponse> {
+    app.native_bridge().refresh_eink_screen()
+}
+
+#[command]
+pub(crate) async fn update_reading_widget<R: Runtime>(
+    app: AppHandle<R>,
+    payload: UpdateReadingWidgetRequest,
+) -> Result<()> {
+    app.native_bridge().update_reading_widget(payload)
+}
+
+/// Snapshot a region of the calling webview and return it as binary PNG
+/// (`tauri::ipc::Response`, no JSON encoding) for the mesh page-curl
+/// texture (#555). Platforms without a capture implementation reject,
+/// which the JS side treats as "fall back to the CSS curl".
+#[command]
+pub(crate) async fn capture_webview_region<R: Runtime>(
+    app: AppHandle<R>,
+    window: tauri::WebviewWindow<R>,
+    payload: CaptureWebviewRegionRequest,
+) -> Result<tauri::ipc::Response> {
+    let png = app
+        .native_bridge()
+        .capture_webview_region(&window, payload)?;
+    Ok(tauri::ipc::Response::new(png))
 }

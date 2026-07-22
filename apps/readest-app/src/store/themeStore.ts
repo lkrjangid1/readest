@@ -16,6 +16,8 @@ declare global {
       setTheme: (mode?: ThemeMode, color?: string) => void;
       getTheme: () => { themeMode: ThemeMode; themeColor: string };
     };
+    __READEST_IS_EINK?: boolean;
+    onNativeColorSchemeChange?: (colorScheme: 'light' | 'dark') => void;
   }
 }
 
@@ -57,7 +59,8 @@ const getInitialThemeMode = (): ThemeMode => {
 
 const getInitialThemeColor = (): string => {
   if (typeof window !== 'undefined' && localStorage) {
-    return localStorage.getItem('themeColor') || 'default';
+    const defaultColor = window.__READEST_IS_EINK ? 'contrast' : 'default';
+    return localStorage.getItem('themeColor') || defaultColor;
   }
   return 'default';
 };
@@ -138,7 +141,12 @@ export const useThemeStore = create<ThemeState>((set, get) => {
     handleSystemThemeChange: (systemIsDarkMode) => {
       const mode = get().themeMode;
       const isDarkMode = mode === 'dark' || (mode === 'auto' && systemIsDarkMode);
+      document.documentElement.setAttribute(
+        'data-theme',
+        `${get().themeColor}-${isDarkMode ? 'dark' : 'light'}`,
+      );
       set({ systemIsDarkMode, isDarkMode });
+      set({ themeCode: getThemeCode() });
     },
     updateSafeAreaInsets: (insets) => {
       set({ safeAreaInsets: insets });
@@ -192,6 +200,12 @@ export const initSystemThemeListener = (appService: AppService) => {
   if (typeof window === 'undefined' || !appService) return;
 
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const applySystemTheme = (systemIsDarkMode: boolean) => {
+    if (typeof window !== 'undefined' && localStorage) {
+      localStorage.setItem('systemIsDarkMode', systemIsDarkMode ? 'true' : 'false');
+    }
+    useThemeStore.getState().handleSystemThemeChange(systemIsDarkMode);
+  };
   const updateColorTheme = async () => {
     let systemIsDarkMode;
     if (appService.isIOSApp) {
@@ -200,7 +214,7 @@ export const initSystemThemeListener = (appService: AppService) => {
     } else {
       systemIsDarkMode = mediaQuery.matches;
     }
-    useThemeStore.getState().handleSystemThemeChange(systemIsDarkMode);
+    applySystemTheme(systemIsDarkMode);
   };
 
   const updateWindowTheme = async () => {
@@ -214,5 +228,16 @@ export const initSystemThemeListener = (appService: AppService) => {
   mediaQuery?.addEventListener('change', updateColorTheme);
   document.addEventListener('visibilitychange', updateColorTheme);
   window.addEventListener('resize', updateWindowTheme);
+
+  // iOS WKWebView never fires the `prefers-color-scheme` media query
+  // `change` event while the app stays foregrounded (e.g. toggling dark
+  // mode from Control Center), so the native plugin pushes the new
+  // appearance through this callback instead.
+  if (appService.isIOSApp) {
+    window.onNativeColorSchemeChange = (colorScheme) => {
+      applySystemTheme(colorScheme === 'dark');
+    };
+  }
+
   updateColorTheme();
 };

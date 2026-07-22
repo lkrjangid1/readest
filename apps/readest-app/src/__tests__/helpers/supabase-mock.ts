@@ -45,7 +45,7 @@ export const setupSupabaseMocks = async (
       eq: vi.fn().mockResolvedValue(customResponses.update || { data: {}, error: null }),
     })),
     insert: vi.fn().mockResolvedValue(customResponses.insert || { data: {}, error: null }),
-  } as any);
+  } as unknown as ReturnType<typeof supabase.from>);
 
   vi.mocked(createSupabaseAdminClient).mockReturnValue({
     from: vi.fn(() => ({
@@ -101,5 +101,5 @@ export const setupSupabaseMocks = async (
         match: vi.fn().mockResolvedValue(customResponses.adminDelete || { data: {}, error: null }),
       })),
     })),
-  } as any);
+  } as unknown as ReturnType<typeof createSupabaseAdminClient>);
 };

@@ -7,6 +7,7 @@ Default permissions for the plugin
 - `allow-auth-with-safari`
 - `allow-auth-with-custom-tab`
 - `allow-copy-uri-to-path`
+- `allow-save-image-to-gallery`
 - `allow-use-background-audio`
 - `allow-install-package`
 - `allow-set-system-ui-visibility`
@@ -14,6 +15,7 @@ Default permissions for the plugin
 - `allow-get-sys-fonts-list`
 - `allow-intercept-keys`
 - `allow-lock-screen-orientation`
+- `allow-iap-is-available`
 - `allow-iap-initialize`
 - `allow-iap-fetch-products`
 - `allow-iap-purchase-product`
@@ -23,9 +25,30 @@ Default permissions for the plugin
 - `allow-get-screen-brightness`
 - `allow-set-screen-brightness`
 - `allow-get-external-sdcard-path`
+- `allow-open-external-url`
+- `allow-show-lookup-popover`
+- `allow-get-lookup-dictionary`
+- `allow-clear-lookup-dictionary`
+- `allow-select-directory`
+- `allow-get-storefront-region-code`
 - `allow-request-manage-storage-permission`
+- `allow-register-listener`
+- `allow-remove-listener`
+- `allow-check-permissions`
+- `allow-request-permissions`
 - `allow-checkPermissions`
 - `allow-requestPermissions`
+- `allow-set-sync-passphrase`
+- `allow-get-sync-passphrase`
+- `allow-clear-sync-passphrase`
+- `allow-is-sync-keychain-available`
+- `allow-set-secure-item`
+- `allow-get-secure-item`
+- `allow-clear-secure-item`
+- `allow-refresh-eink-screen`
+- `allow-update-reading-widget`
+- `allow-capture-webview-region`
+- `allow-set-text-selection-suppressed`
 
 ## Permission Table
 
@@ -91,6 +114,58 @@ Denies the auth_with_safari command without any pre-configured scope.
 <tr>
 <td>
 
+`native-bridge:allow-capture-webview-region`
+
+</td>
+<td>
+
+Enables the capture_webview_region command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-capture-webview-region`
+
+</td>
+<td>
+
+Denies the capture_webview_region command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-check-permissions`
+
+</td>
+<td>
+
+Enables the check-permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-check-permissions`
+
+</td>
+<td>
+
+Denies the check-permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-bridge:allow-checkPermissions`
 
 </td>
@@ -110,6 +185,136 @@ Enables the checkPermissions command without any pre-configured scope.
 <td>
 
 Denies the checkPermissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-check-permissions`
+
+</td>
+<td>
+
+Enables the check_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-check-permissions`
+
+</td>
+<td>
+
+Denies the check_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-clear-lookup-dictionary`
+
+</td>
+<td>
+
+Enables the clear_lookup_dictionary command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-clear-lookup-dictionary`
+
+</td>
+<td>
+
+Denies the clear_lookup_dictionary command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-clear-secure-item`
+
+</td>
+<td>
+
+Enables the clear_secure_item command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-clear-secure-item`
+
+</td>
+<td>
+
+Denies the clear_secure_item command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-clear-sync-passphrase`
+
+</td>
+<td>
+
+Enables the clear_sync_passphrase command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-clear-sync-passphrase`
+
+</td>
+<td>
+
+Denies the clear_sync_passphrase command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-clip-url`
+
+</td>
+<td>
+
+Enables the clip_url command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-clip-url`
+
+</td>
+<td>
+
+Denies the clip_url command without any pre-configured scope.
 
 </td>
 </tr>
@@ -169,6 +374,32 @@ Denies the get_external_sdcard_path command without any pre-configured scope.
 <tr>
 <td>
 
+`native-bridge:allow-get-lookup-dictionary`
+
+</td>
+<td>
+
+Enables the get_lookup_dictionary command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-get-lookup-dictionary`
+
+</td>
+<td>
+
+Denies the get_lookup_dictionary command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-bridge:allow-get-safe-area-insets`
 
 </td>
@@ -221,6 +452,32 @@ Denies the get_screen_brightness command without any pre-configured scope.
 <tr>
 <td>
 
+`native-bridge:allow-get-secure-item`
+
+</td>
+<td>
+
+Enables the get_secure_item command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-get-secure-item`
+
+</td>
+<td>
+
+Denies the get_secure_item command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-bridge:allow-get-status-bar-height`
 
 </td>
@@ -240,6 +497,58 @@ Enables the get_status_bar_height command without any pre-configured scope.
 <td>
 
 Denies the get_status_bar_height command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-get-storefront-region-code`
+
+</td>
+<td>
+
+Enables the get_storefront_region_code command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-get-storefront-region-code`
+
+</td>
+<td>
+
+Denies the get_storefront_region_code command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-get-sync-passphrase`
+
+</td>
+<td>
+
+Enables the get_sync_passphrase command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-get-sync-passphrase`
+
+</td>
+<td>
+
+Denies the get_sync_passphrase command without any pre-configured scope.
 
 </td>
 </tr>
@@ -351,6 +660,32 @@ Denies the iap_initialize command without any pre-configured scope.
 <tr>
 <td>
 
+`native-bridge:allow-iap-is-available`
+
+</td>
+<td>
+
+Enables the iap_is_available command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-iap-is-available`
+
+</td>
+<td>
+
+Denies the iap_is_available command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-bridge:allow-iap-purchase-product`
 
 </td>
@@ -455,6 +790,32 @@ Denies the intercept_keys command without any pre-configured scope.
 <tr>
 <td>
 
+`native-bridge:allow-is-sync-keychain-available`
+
+</td>
+<td>
+
+Enables the is_sync_keychain_available command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-is-sync-keychain-available`
+
+</td>
+<td>
+
+Denies the is_sync_keychain_available command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-bridge:allow-lock-screen-orientation`
 
 </td>
@@ -474,6 +835,136 @@ Enables the lock_screen_orientation command without any pre-configured scope.
 <td>
 
 Denies the lock_screen_orientation command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-open-external-url`
+
+</td>
+<td>
+
+Enables the open_external_url command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-open-external-url`
+
+</td>
+<td>
+
+Denies the open_external_url command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-refresh-eink-screen`
+
+</td>
+<td>
+
+Enables the refresh_eink_screen command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-refresh-eink-screen`
+
+</td>
+<td>
+
+Denies the refresh_eink_screen command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-register-listener`
+
+</td>
+<td>
+
+Enables the register_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-register-listener`
+
+</td>
+<td>
+
+Denies the register_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-remove-listener`
+
+</td>
+<td>
+
+Enables the remove_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-remove-listener`
+
+</td>
+<td>
+
+Denies the remove_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-request-permissions`
+
+</td>
+<td>
+
+Enables the request-permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-request-permissions`
+
+</td>
+<td>
+
+Denies the request-permissions command without any pre-configured scope.
 
 </td>
 </tr>
@@ -533,6 +1024,84 @@ Denies the request_manage_storage_permission command without any pre-configured 
 <tr>
 <td>
 
+`native-bridge:allow-request-permissions`
+
+</td>
+<td>
+
+Enables the request_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-request-permissions`
+
+</td>
+<td>
+
+Denies the request_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-save-image-to-gallery`
+
+</td>
+<td>
+
+Enables the save_image_to_gallery command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-save-image-to-gallery`
+
+</td>
+<td>
+
+Denies the save_image_to_gallery command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-select-directory`
+
+</td>
+<td>
+
+Enables the select_directory command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-select-directory`
+
+</td>
+<td>
+
+Denies the select_directory command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-bridge:allow-set-screen-brightness`
 
 </td>
@@ -559,6 +1128,58 @@ Denies the set_screen_brightness command without any pre-configured scope.
 <tr>
 <td>
 
+`native-bridge:allow-set-secure-item`
+
+</td>
+<td>
+
+Enables the set_secure_item command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-set-secure-item`
+
+</td>
+<td>
+
+Denies the set_secure_item command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-set-sync-passphrase`
+
+</td>
+<td>
+
+Enables the set_sync_passphrase command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-set-sync-passphrase`
+
+</td>
+<td>
+
+Denies the set_sync_passphrase command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `native-bridge:allow-set-system-ui-visibility`
 
 </td>
@@ -578,6 +1199,84 @@ Enables the set_system_ui_visibility command without any pre-configured scope.
 <td>
 
 Denies the set_system_ui_visibility command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-set-text-selection-suppressed`
+
+</td>
+<td>
+
+Enables the set_text_selection_suppressed command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-set-text-selection-suppressed`
+
+</td>
+<td>
+
+Denies the set_text_selection_suppressed command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-show-lookup-popover`
+
+</td>
+<td>
+
+Enables the show_lookup_popover command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-show-lookup-popover`
+
+</td>
+<td>
+
+Denies the show_lookup_popover command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:allow-update-reading-widget`
+
+</td>
+<td>
+
+Enables the update_reading_widget command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-bridge:deny-update-reading-widget`
+
+</td>
+<td>
+
+Denies the update_reading_widget command without any pre-configured scope.
 
 </td>
 </tr>

@@ -57,7 +57,7 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({ sources, isOpen, onSele
               tabIndex={0}
               key={index}
               onClick={() => onSelect(source)}
-              className='hover:bg-base-300/75 bg-base-200 border-base-200 cursor-pointer rounded-md border p-3 transition-colors'
+              className='hover:bg-base-300/75 bg-base-200 border-base-200 w-full cursor-pointer rounded-md border p-3 transition-colors'
             >
               <div className='flex items-start gap-4'>
                 <div className='aspect-[28/41] h-full w-[40%] max-w-32 shadow-md'>
@@ -89,8 +89,10 @@ const SourceSelector: React.FC<SourceSelectorProps> = ({ sources, isOpen, onSele
                       {source.data.publisher ? `${source.data.publisher} • ` : ''}
                       {source.data.published}
                     </div>
-                    {source.data.identifier && (
-                      <div className='text-gray-500'>Identifier: {source.data.identifier}</div>
+                    {(source.data.isbn || source.data.identifier) && (
+                      <div className='text-gray-500'>
+                        ISBN: {source.data.isbn || source.data.identifier}
+                      </div>
                     )}
                     {source.data.description && (
                       <div className='line-clamp-3 text-xs text-gray-500'>

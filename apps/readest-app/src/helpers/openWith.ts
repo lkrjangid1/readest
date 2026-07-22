@@ -1,4 +1,5 @@
 import { isWebAppPlatform, hasCli } from '@/services/environment';
+import { AppService } from '@/types/system';
 import { getCurrent } from '@tauri-apps/plugin-deep-link';
 
 declare global {
@@ -20,7 +21,17 @@ const parseWindowOpenWithFiles = () => {
 
 const parseCLIOpenWithFiles = async () => {
   const { getMatches } = await import('@tauri-apps/plugin-cli');
-  const matches = await getMatches();
+  let matches;
+  try {
+    matches = await getMatches();
+  } catch (err) {
+    // getMatches() rejects when argv carries an option the file-only CLI schema
+    // does not define — as sentry-minidump's `--crash-reporter-server` relaunch
+    // used to (READEST-Y, before that handler was removed). Treat a parse failure
+    // as "no CLI files" instead of leaking an unhandled rejection.
+    console.warn('Failed to parse CLI open-with args', err);
+    return [];
+  }
   const args = matches?.args;
   const files: string[] = [];
   if (args) {
@@ -35,14 +46,18 @@ const parseCLIOpenWithFiles = async () => {
   return files;
 };
 
-const parseIntentOpenWithFiles = async () => {
+const parseIntentOpenWithFiles = async (appService: AppService | null) => {
   const urls = await getCurrent();
   if (urls && urls.length > 0) {
     console.log('Intent Open with URL:', urls);
     return urls
       .map((url) => {
         if (url.startsWith('file://')) {
-          return decodeURI(url.replace('file://', ''));
+          if (appService?.isIOSApp) {
+            return decodeURI(url);
+          } else {
+            return decodeURI(url.replace('file://', ''));
+          }
         } else if (url.startsWith('content://')) {
           return url;
         } else {
@@ -55,7 +70,24 @@ const parseIntentOpenWithFiles = async () => {
   return null;
 };
 
-export const parseOpenWithFiles = async () => {
+/**
+ * Decide whether an "Open with" file intent should open as a transient book
+ * (straight to the reader, no library write) or be imported into the library.
+ *
+ * Only Android's `VIEW` intent (the system "Open with Readest" chooser) can be
+ * transient, and only when the user has turned off "Auto Import on File Open".
+ * Every other case — a share-sheet `SEND` capture, or `VIEW` with auto-import
+ * on — imports the file so it persists in the library (and syncs to the cloud
+ * on mobile).
+ */
+export const shouldOpenTransient = (
+  action: 'VIEW' | 'SEND' | undefined,
+  autoImportBooksOnOpen: boolean,
+): boolean => {
+  return action === 'VIEW' && !autoImportBooksOnOpen;
+};
+
+export const parseOpenWithFiles = async (appService: AppService | null) => {
   if (isWebAppPlatform()) return [];
 
   let files = parseWindowOpenWithFiles();
@@ -63,7 +95,7 @@ export const parseOpenWithFiles = async () => {
     files = await parseCLIOpenWithFiles();
   }
   if (!files || files.length === 0) {
-    files = await parseIntentOpenWithFiles();
+    files = await parseIntentOpenWithFiles(appService);
   }
   return files;
 };

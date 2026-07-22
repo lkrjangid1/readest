@@ -49,9 +49,31 @@ impl<R: Runtime> NativeBridge<R> {
 }
 
 impl<R: Runtime> NativeBridge<R> {
+    pub fn save_image_to_gallery(
+        &self,
+        payload: SaveImageToGalleryRequest,
+    ) -> crate::Result<SaveImageToGalleryResponse> {
+        self.0
+            .run_mobile_plugin("save_image_to_gallery", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
     pub fn use_background_audio(&self, payload: UseBackgroundAudioRequest) -> crate::Result<()> {
         self.0
             .run_mobile_plugin("use_background_audio", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn set_text_selection_suppressed(
+        &self,
+        payload: SetTextSelectionSuppressedRequest,
+    ) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("set_text_selection_suppressed", payload)
             .map_err(Into::into)
     }
 }
@@ -109,6 +131,14 @@ impl<R: Runtime> NativeBridge<R> {
     ) -> crate::Result<()> {
         self.0
             .run_mobile_plugin("lock_screen_orientation", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn iap_is_available(&self) -> crate::Result<IAPIsAvailableResponse> {
+        self.0
+            .run_mobile_plugin("iap_is_available", ())
             .map_err(Into::into)
     }
 }
@@ -198,11 +228,168 @@ impl<R: Runtime> NativeBridge<R> {
 }
 
 impl<R: Runtime> NativeBridge<R> {
+    pub fn open_external_url(
+        &self,
+        payload: OpenExternalUrlRequest,
+    ) -> crate::Result<OpenExternalUrlResponse> {
+        self.0
+            .run_mobile_plugin("open_external_url", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn show_lookup_popover(
+        &self,
+        payload: ShowLookupPopoverRequest,
+    ) -> crate::Result<ShowLookupPopoverResponse> {
+        self.0
+            .run_mobile_plugin("show_lookup_popover", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn select_directory(&self) -> crate::Result<SelectDirectoryResponse> {
+        self.0
+            .run_mobile_plugin("select_directory", ())
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn get_storefront_region_code(&self) -> crate::Result<GetStorefrontRegionCodeResponse> {
+        self.0
+            .run_mobile_plugin("get_storefront_region_code", ())
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
     pub fn request_manage_storage_permission(
         &self,
     ) -> crate::Result<RequestManageStoragePermissionResponse> {
         self.0
             .run_mobile_plugin("request_manage_storage_permission", ())
             .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn set_sync_passphrase(
+        &self,
+        payload: SetSyncPassphraseRequest,
+    ) -> crate::Result<SyncPassphraseResponse> {
+        self.0
+            .run_mobile_plugin("set_sync_passphrase", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn get_sync_passphrase(&self) -> crate::Result<GetSyncPassphraseResponse> {
+        self.0
+            .run_mobile_plugin("get_sync_passphrase", ())
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn clear_sync_passphrase(&self) -> crate::Result<SyncPassphraseResponse> {
+        self.0
+            .run_mobile_plugin("clear_sync_passphrase", ())
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn is_sync_keychain_available(&self) -> crate::Result<SyncKeychainAvailableResponse> {
+        self.0
+            .run_mobile_plugin("is_sync_keychain_available", ())
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn set_secure_item(
+        &self,
+        payload: SetSecureItemRequest,
+    ) -> crate::Result<SecureItemResponse> {
+        self.0
+            .run_mobile_plugin("set_secure_item", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn get_secure_item(
+        &self,
+        payload: GetSecureItemRequest,
+    ) -> crate::Result<GetSecureItemResponse> {
+        self.0
+            .run_mobile_plugin("get_secure_item", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn clear_secure_item(
+        &self,
+        payload: GetSecureItemRequest,
+    ) -> crate::Result<SecureItemResponse> {
+        self.0
+            .run_mobile_plugin("clear_secure_item", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn refresh_eink_screen(&self) -> crate::Result<RefreshEinkScreenResponse> {
+        self.0
+            .run_mobile_plugin("refresh_eink_screen", ())
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    /// Open a full-screen `WKWebView` / `WebView` over the main app,
+    /// navigate to `payload.url` with a real Chrome UA, wait for load
+    /// + settle, then return `document.documentElement.outerHTML`. The
+    /// overlay UX (loading spinner, theme-matched backdrop, localized
+    /// labels) is driven by the same fields the desktop `clip_url`
+    /// command consumes — see `clip_url.rs` for the canonical struct.
+    pub fn clip_url(&self, payload: ClipUrlRequest) -> crate::Result<ClipUrlResponse> {
+        self.0
+            .run_mobile_plugin("clip_url", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    pub fn update_reading_widget(&self, payload: UpdateReadingWidgetRequest) -> crate::Result<()> {
+        self.0
+            .run_mobile_plugin("update_reading_widget", payload)
+            .map_err(Into::into)
+    }
+}
+
+impl<R: Runtime> NativeBridge<R> {
+    /// Snapshot a region of the webview as PNG bytes for the mesh
+    /// page-curl texture (#555). The Swift (WKWebView takeSnapshot) or
+    /// Kotlin (PixelCopy) side resolves JSON, so the image arrives
+    /// base64-encoded and is decoded here; the JS-facing command then
+    /// returns it binary.
+    pub fn capture_webview_region(
+        &self,
+        _window: &tauri::WebviewWindow<R>,
+        payload: CaptureWebviewRegionRequest,
+    ) -> crate::Result<Vec<u8>> {
+        use base64::Engine as _;
+        let response: CaptureWebviewRegionResponse = self
+            .0
+            .run_mobile_plugin("capture_webview_region", payload)?;
+        base64::engine::general_purpose::STANDARD
+            .decode(response.data)
+            .map_err(|e| crate::Error::NativeBridgeError(format!("invalid base64 PNG: {e}")))
     }
 }

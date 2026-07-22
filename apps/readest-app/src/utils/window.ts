@@ -1,4 +1,4 @@
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getAllWindows, getCurrentWindow } from '@tauri-apps/api/window';
 import { emitTo, TauriEvent } from '@tauri-apps/api/event';
 import { exit } from '@tauri-apps/plugin-process';
 import { type as osType } from '@tauri-apps/plugin-os';
@@ -49,7 +49,15 @@ export const tauriHandleClose = async () => {
 
 export const tauriHandleOnCloseWindow = async (callback: () => void) => {
   const currentWindow = getCurrentWindow();
-  return currentWindow.listen(TauriEvent.WINDOW_CLOSE_REQUESTED, async () => {
+  return await currentWindow.onCloseRequested(async (event) => {
+    event.preventDefault();
+    // On macOS, the main window's close is intercepted by the Rust backend
+    // to hide the window (close-to-hide), keeping the app in the dock. Skip
+    // the in-app cleanup — the user is just minimizing the window and
+    // expects the active book to still be there when the window reopens.
+    if (currentWindow.label === 'main' && (await osType()) === 'macos') {
+      return;
+    }
     await callback();
     if (currentWindow.label.startsWith('reader')) {
       await emitTo('main', 'close-reader-window', { label: currentWindow.label });
@@ -63,20 +71,19 @@ export const tauriHandleOnCloseWindow = async (callback: () => void) => {
 export const tauriHandleToggleFullScreen = async () => {
   const currentWindow = getCurrentWindow();
   const isFullscreen = await currentWindow.isFullscreen();
-  const isMaximized = await currentWindow.isMaximized();
-  if (isMaximized) {
-    await currentWindow.unmaximize();
-  } else {
-    await currentWindow.setFullscreen(!isFullscreen);
-  }
+  // Toggle fullscreen regardless of the maximized state. Previously a maximized
+  // window was only unmaximized here, so the fullscreen button did nothing when
+  // the window was maximized, which is always the case on mobile shells like
+  // Phosh and common on Windows (issue #4034).
+  await currentWindow.setFullscreen(!isFullscreen);
   if ((await osType()) === 'linux') {
     linuxWindowRestoreTransparentBg();
   }
 };
 
 export const tauriHandleSetAlwaysOnTop = async (isAlwaysOnTop: boolean) => {
-  const currentWindow = getCurrentWindow();
-  await currentWindow.setAlwaysOnTop(isAlwaysOnTop);
+  const windows = await getAllWindows();
+  await Promise.all(windows.map((w) => w.setAlwaysOnTop(isAlwaysOnTop)));
 };
 
 export const tauriGetAlwaysOnTop = async () => {

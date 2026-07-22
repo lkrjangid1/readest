@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useSettingsStore } from '@/store/settingsStore';
 import { checkForAppUpdates, checkAppReleaseNotes } from '@/helpers/updater';
 import { parseWebViewInfo } from '@/utils/ua';
 import { getAppVersion } from '@/utils/version';
@@ -25,6 +26,7 @@ type UpdateStatus = 'checking' | 'updating' | 'updated' | 'error';
 export const AboutWindow = () => {
   const _ = useTranslation();
   const { appService } = useEnv();
+  const { settings } = useSettingsStore();
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [browserInfo, setBrowserInfo] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -52,7 +54,7 @@ export const AboutWindow = () => {
   const handleCheckUpdate = async () => {
     setUpdateStatus('checking');
     try {
-      const hasUpdate = await checkForAppUpdates(_, false);
+      const hasUpdate = await checkForAppUpdates(_, false, settings.updateChannel);
       if (hasUpdate) {
         handleClose();
       } else {
@@ -87,7 +89,7 @@ export const AboutWindow = () => {
       boxClassName='sm:!w-[480px] sm:!max-w-screen-sm sm:h-auto'
     >
       {isOpen && (
-        <div className='about-content flex h-full flex-col items-center justify-center gap-4 pb-10 sm:pb-0'>
+        <div className='about-content flex flex-col items-center justify-center gap-4 pb-10 sm:pb-0'>
           <div className='flex flex-1 flex-col items-center justify-end gap-2 px-8 py-2'>
             <div className='mb-2 mt-6'>
               <Image src='/icon.png' alt='App Logo' className='h-20 w-20' width={64} height={64} />
@@ -101,7 +103,7 @@ export const AboutWindow = () => {
             <div className='my-1 h-5'>
               {!updateStatus && (
                 <button
-                  className='badge badge-primary cursor-pointer p-2'
+                  className='btn btn-sm btn-primary cursor-pointer p-1 text-xs'
                   onClick={appService?.hasUpdater ? handleCheckUpdate : handleShowRecentUpdates}
                 >
                   {_('Check Update')}
@@ -121,7 +123,7 @@ export const AboutWindow = () => {
             </div>
           </div>
 
-          <hr className='border-base-300 my-12 w-full sm:my-4' />
+          <hr aria-hidden='true' className='border-base-300 my-12 w-full sm:my-4' />
 
           <div
             className='flex flex-1 flex-col items-center justify-start gap-2 px-4 text-center'

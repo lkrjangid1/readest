@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   RiFolderOpenLine,
   RiCheckboxCircleFill,
@@ -7,7 +7,6 @@ import {
   RiLoader2Line,
 } from 'react-icons/ri';
 import { documentDir, join } from '@tauri-apps/api/path';
-import { invoke, PermissionState } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -20,6 +19,7 @@ import { formatBytes } from '@/utils/book';
 import { getOSPlatform } from '@/utils/misc';
 import { getExternalSDCardPath } from '@/utils/bridge';
 import { FILE_REVEAL_LABELS, FILE_REVEAL_PLATFORMS } from '@/utils/os';
+import { requestStoragePermission } from '@/utils/permission';
 import Dialog from '@/components/Dialog';
 import Dropdown from '@/components/Dropdown';
 import MenuItem from '@/components/MenuItem';
@@ -40,10 +40,6 @@ interface MigrationProgress {
   current: number;
   total: number;
   currentFile?: string;
-}
-
-interface Permissions {
-  manageStorage: PermissionState;
 }
 
 export const MigrateDataWindow = () => {
@@ -158,13 +154,7 @@ export const MigrateDataWindow = () => {
     setErrorMessage('');
 
     if (!dir.includes('Android/data')) {
-      let permission = await invoke<Permissions>('plugin:native-bridge|checkPermissions');
-      if (permission.manageStorage !== 'granted') {
-        permission = await invoke<Permissions>(
-          'plugin:native-bridge|request_manage_storage_permission',
-        );
-      }
-      if (permission.manageStorage !== 'granted') return;
+      if (!(await requestStoragePermission())) return;
     }
 
     try {
@@ -202,7 +192,7 @@ export const MigrateDataWindow = () => {
 
         const srcPath = await join(currentDataDir, file.path);
         const destPath = await join(newDataDir, file.path);
-        await appService.copyFile(srcPath, destPath, 'None');
+        await appService.copyFile(srcPath, 'None', destPath, 'None');
       }
 
       // Verify all files copied
@@ -337,7 +327,7 @@ export const MigrateDataWindow = () => {
               >
                 <div
                   className={clsx(
-                    'folder-menu dropdown-content dropdown-center no-triangle',
+                    'folder-menu dropdown-content no-triangle left-0',
                     'border-base-300 !bg-base-200 z-20 mt-1 max-w-[90vw] shadow-2xl',
                   )}
                 >
@@ -458,7 +448,7 @@ export const MigrateDataWindow = () => {
           <div className='flex gap-3 pt-2'>
             {migrationStatus === 'completed' ? (
               <>
-                <button className='btn btn-outline flex-1' onClick={handleClose}>
+                <button className='btn btn-ghost flex-1' onClick={handleClose}>
                   {_('Close')}
                 </button>
                 <button className='btn btn-primary flex-1' onClick={handleRestartApp}>
@@ -468,7 +458,7 @@ export const MigrateDataWindow = () => {
             ) : (
               <>
                 <button
-                  className='btn btn-outline flex-1'
+                  className='btn btn-ghost flex-1'
                   onClick={handleClose}
                   disabled={migrationStatus === 'migrating'}
                 >

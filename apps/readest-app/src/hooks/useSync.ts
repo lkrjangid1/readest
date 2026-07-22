@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEnv } from '@/context/EnvContext';
 import { useSyncContext } from '@/context/SyncContext';
 import { SyncData, SyncOp, SyncResult, SyncType } from '@/libs/sync';
+import { isSyncCategoryEnabled } from '@/services/sync/syncCategories';
 import { useSettingsStore } from '@/store/settingsStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { transformBookConfigFromDB } from '@/utils/transform';
@@ -18,25 +20,47 @@ const transformsFromDB = {
   configs: transformBookConfigFromDB,
 };
 
-const computeMaxTimestamp = (records: BookDataRecord[]): number => {
+// The incremental-pull watermark. The server stamps a `synced_at` on every
+// books write (issue #4678), so it — not updated_at — is the monotonic cursor:
+// keying on it lets a server-resolved merge propagate without the date-read
+// library jumping to sync-processing time. Rows without synced_at (configs,
+// notes, or a pre-migration server) fall back to max(updated_at, deleted_at);
+// for books a delete bumps synced_at too, so deleted_at need not be consulted.
+export const computeMaxTimestamp = (records: BookDataRecord[]): number => {
   let maxTime = 0;
   for (const rec of records) {
+    if (rec.synced_at) {
+      maxTime = Math.max(maxTime, new Date(rec.synced_at).getTime());
+      continue;
+    }
     if (rec.updated_at) {
-      const updatedTime = new Date(rec.updated_at).getTime();
-      maxTime = Math.max(maxTime, updatedTime);
+      maxTime = Math.max(maxTime, new Date(rec.updated_at).getTime());
     }
     if (rec.deleted_at) {
-      const deletedTime = new Date(rec.deleted_at).getTime();
-      maxTime = Math.max(maxTime, deletedTime);
+      maxTime = Math.max(maxTime, new Date(rec.deleted_at).getTime());
     }
   }
   return maxTime;
 };
 
+// Count the records a pull surfaces to the user as "synced". Deleted records
+// never count. For books we additionally require an upload state: a book is
+// indexed in the cloud as soon as its metadata syncs, but updateLibrary only
+// adds books that are uploaded && !deleted, so counting metadata-only books
+// would over-report relative to what actually lands in the library.
+export const countSyncedRecords = (
+  type: SyncType,
+  records: BookDataRecord[] | null | undefined,
+): number => {
+  if (!records?.length) return 0;
+  return records.filter((rec) => !rec.deleted_at && (type !== 'books' || !!rec.uploaded_at)).length;
+};
+
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 export function useSync(bookKey?: string) {
   const router = useRouter();
-  const { settings, setSettings } = useSettingsStore();
+  const { envConfig } = useEnv();
+  const { settings, setSettings, saveSettings } = useSettingsStore();
   const { getConfig, setConfig } = useBookDataStore();
   const { setIsSyncing } = useReaderStore();
   const config = bookKey ? getConfig(bookKey) : null;
@@ -106,10 +130,15 @@ export function useSync(bookKey?: string) {
 
     try {
       const result = await syncClient.pullChanges(since, type, bookId, metaHash);
-      setSyncResult({ ...syncResult, [type]: result[type] });
-      const records = result[type];
-      if (!records?.length) return;
-      const maxTime = computeMaxTimestamp(records);
+      const resultAsRecord = result as unknown as Record<
+        string,
+        BookDataRecord[] | null | undefined
+      >;
+      setSyncResult({ ...syncResult, [type]: resultAsRecord[type] });
+      const records = resultAsRecord[type];
+      if (since > 1000 && !records?.length) return 0;
+      // For since <= 1000, we set lastSyncedAt to now if no records returned
+      const maxTime = records?.length ? computeMaxTimestamp(records) : Date.now();
       setLastSyncedAt(maxTime);
 
       // due to closures in React hooks the settings might be stale
@@ -137,30 +166,42 @@ export function useSync(bookKey?: string) {
           }
           break;
       }
+      return countSyncedRecords(type, records);
     } catch (err: unknown) {
       console.error(err);
       if (err instanceof Error) {
-        if (err.message.includes('Not authenticated') && settings.keepLogin) {
-          settings.keepLogin = false;
-          setSettings(settings);
+        // Read live store settings, not the stale hook closure (see below).
+        const latest = useSettingsStore.getState().settings;
+        if (err.message.includes('Not authenticated') && latest.keepLogin) {
+          latest.keepLogin = false;
+          setSettings(latest);
           navigateToLogin(router);
         }
         setSyncError(err.message || `Error pulling ${type}`);
       } else {
         setSyncError(`Error pulling ${type}`);
       }
+      return 0;
     } finally {
       setSyncing(false);
+      // Persist the LIVE store settings, never the hook-closure `settings`
+      // captured at this pull's render. On a slow connection a settings
+      // change that lands mid-pull (notably a WebDAV connect, which is the
+      // only integration not re-hydrated from the server replica) would be
+      // silently overwritten on disk here and read back as "Not connected"
+      // after the app is reopened. Issue #4780.
+      saveSettings(envConfig, useSettingsStore.getState().settings);
     }
   };
 
-  const pushChanges = async (payload: SyncData) => {
+  const pushChanges = async (payload: SyncData): Promise<boolean> => {
     setSyncing(true);
     setSyncError(null);
 
     try {
       const result = await syncClient.pushChanges(payload);
       setSyncResult(result);
+      return true;
     } catch (err: unknown) {
       console.error(err);
       if (err instanceof Error) {
@@ -168,20 +209,28 @@ export function useSync(bookKey?: string) {
       } else {
         setSyncError('Error pushing changes');
       }
+      return false;
     } finally {
       setSyncing(false);
     }
   };
 
   const syncBooks = useCallback(
-    async (books?: Book[], op: SyncOp = 'both') => {
+    async (books?: Book[], op: SyncOp = 'both', since?: number) => {
       if (!lastSyncedAtInited) return;
+      if (!isSyncCategoryEnabled('book')) return;
       if ((op === 'push' || op === 'both') && books?.length) {
         await pushChanges({ books });
       }
       if (op === 'pull' || op === 'both') {
-        await pullChanges('books', lastSyncedAtBooks, setLastSyncedAtBooks, setSyncingBooks);
+        return await pullChanges(
+          'books',
+          since ?? lastSyncedAtBooks + 1,
+          setLastSyncedAtBooks,
+          setSyncingBooks,
+        );
       }
+      return;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastSyncedAtInited, lastSyncedAtBooks],
@@ -190,8 +239,12 @@ export function useSync(bookKey?: string) {
   const syncConfigs = useCallback(
     async (bookConfigs?: BookConfig[], bookId?: string, metaHash?: string, op: SyncOp = 'both') => {
       if (!bookId && !lastSyncedAtInited) return;
+      if (!isSyncCategoryEnabled('progress')) return;
       if ((op === 'push' || op === 'both') && bookConfigs?.length) {
-        await pushChanges({ configs: bookConfigs });
+        const pushed = await pushChanges({ configs: bookConfigs });
+        if (pushed && bookId && bookKey) {
+          setConfig(bookKey, { lastPushedAtConfig: Date.now() });
+        }
       }
       if (op === 'pull' || op === 'both') {
         await pullChanges(
@@ -211,8 +264,12 @@ export function useSync(bookKey?: string) {
   const syncNotes = useCallback(
     async (bookNotes?: BookNote[], bookId?: string, metaHash?: string, op: SyncOp = 'both') => {
       if (!lastSyncedAtInited) return;
+      if (!isSyncCategoryEnabled('note')) return;
       if ((op === 'push' || op === 'both') && bookNotes?.length) {
-        await pushChanges({ notes: bookNotes });
+        const pushed = await pushChanges({ notes: bookNotes });
+        if (pushed && bookId && bookKey) {
+          setConfig(bookKey, { lastPushedAtNotes: Date.now() });
+        }
       }
       if (op === 'pull' || op === 'both') {
         await pullChanges(
@@ -257,6 +314,7 @@ export function useSync(bookKey?: string) {
     lastSyncedAtBooks,
     lastSyncedAtNotes,
     lastSyncedAtConfigs,
+    useSyncInited: lastSyncedAtInited,
     pullChanges,
     pushChanges,
     syncBooks,

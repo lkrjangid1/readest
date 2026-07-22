@@ -2,16 +2,17 @@ import clsx from 'clsx';
 import React, { useEffect, useRef } from 'react';
 import { useEnv } from '@/context/EnvContext';
 
-import { tauriHandleMinimize, tauriHandleToggleMaximize } from '@/utils/window';
+import { tauriHandleMinimize, tauriHandleToggleMaximize, tauriHandleClose } from '@/utils/window';
 import { isTauriAppPlatform } from '@/services/environment';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface WindowButtonsProps {
   className?: string;
-  headerRef?: React.RefObject<HTMLDivElement>;
+  headerRef?: React.RefObject<HTMLDivElement | null>;
   showMinimize?: boolean;
   showMaximize?: boolean;
   showClose?: boolean;
+  closeButtonLabel?: string;
   onMinimize?: () => void;
   onToggleMaximize?: () => void;
   onClose?: () => void;
@@ -41,6 +42,7 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
   showMinimize = true,
   showMaximize = true,
   showClose = true,
+  closeButtonLabel,
   onMinimize,
   onToggleMaximize,
   onClose,
@@ -165,7 +167,6 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
   }, []);
 
   const handleMinimize = async () => {
-    onClose;
     if (onMinimize) {
       onMinimize();
     } else {
@@ -181,13 +182,13 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
     }
   };
 
-  // const handleClose = async () => {
-  //   if (onClose) {
-  //     onClose();
-  //   } else {
-  //     tauriHandleClose();
-  //   }
-  // };
+  const handleClose = async () => {
+    if (onClose) {
+      onClose();
+    } else {
+      tauriHandleClose();
+    }
+  };
 
   return (
     <div
@@ -218,8 +219,12 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
         </WindowButton>
       )}
 
-      {/* {showClose && (appService?.hasWindowBar || onClose) && (
-        <WindowButton onClick={handleClose} label={_('Close')} id='titlebar-close'>
+      {showClose && (appService?.hasWindowBar || onClose) && (
+        <WindowButton
+          onClick={handleClose}
+          label={closeButtonLabel || _('Close')}
+          id='titlebar-close'
+        >
           <svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' viewBox='0 0 24 24'>
             <path
               fill='currentColor'
@@ -227,7 +232,7 @@ const WindowButtons: React.FC<WindowButtonsProps> = ({
             />
           </svg>
         </WindowButton>
-      )} */}
+      )}
     </div>
   );
 };

@@ -16,10 +16,16 @@ Default permissions for the plugin
 - `allow-set-media-session-active`
 - `allow-update-media-session-state`
 - `allow-update-media-session-metadata`
+- `allow-update-carplay-state`
+- `allow-playout-enqueue`
+- `allow-playout-control`
+- `allow-playout-position`
+- `allow-register-listener`
+- `allow-remove-listener`
+- `allow-check-permissions`
+- `allow-request-permissions`
 - `allow-checkPermissions`
 - `allow-requestPermissions`
-- `allow-registerListener`
-- `allow-remove-listener`
 
 ## Permission Table
 
@@ -52,6 +58,32 @@ Enables the checkPermissions command without any pre-configured scope.
 <td>
 
 Denies the checkPermissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:allow-check-permissions`
+
+</td>
+<td>
+
+Enables the check_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:deny-check-permissions`
+
+</td>
+<td>
+
+Denies the check_permissions command without any pre-configured scope.
 
 </td>
 </tr>
@@ -137,12 +169,12 @@ Denies the pause command without any pre-configured scope.
 <tr>
 <td>
 
-`native-tts:allow-registerListener`
+`native-tts:allow-playout-control`
 
 </td>
 <td>
 
-Enables the registerListener command without any pre-configured scope.
+Enables the playout_control command without any pre-configured scope.
 
 </td>
 </tr>
@@ -150,12 +182,90 @@ Enables the registerListener command without any pre-configured scope.
 <tr>
 <td>
 
-`native-tts:deny-registerListener`
+`native-tts:deny-playout-control`
 
 </td>
 <td>
 
-Denies the registerListener command without any pre-configured scope.
+Denies the playout_control command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:allow-playout-enqueue`
+
+</td>
+<td>
+
+Enables the playout_enqueue command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:deny-playout-enqueue`
+
+</td>
+<td>
+
+Denies the playout_enqueue command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:allow-playout-position`
+
+</td>
+<td>
+
+Enables the playout_position command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:deny-playout-position`
+
+</td>
+<td>
+
+Denies the playout_position command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:allow-register-listener`
+
+</td>
+<td>
+
+Enables the register_listener command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:deny-register-listener`
+
+</td>
+<td>
+
+Denies the register_listener command without any pre-configured scope.
 
 </td>
 </tr>
@@ -208,6 +318,32 @@ Enables the requestPermissions command without any pre-configured scope.
 <td>
 
 Denies the requestPermissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:allow-request-permissions`
+
+</td>
+<td>
+
+Enables the request_permissions command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:deny-request-permissions`
+
+</td>
+<td>
+
+Denies the request_permissions command without any pre-configured scope.
 
 </td>
 </tr>
@@ -390,6 +526,32 @@ Enables the stop command without any pre-configured scope.
 <td>
 
 Denies the stop command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:allow-update-carplay-state`
+
+</td>
+<td>
+
+Enables the update_carplay_state command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`native-tts:deny-update-carplay-state`
+
+</td>
+<td>
+
+Denies the update_carplay_state command without any pre-configured scope.
 
 </td>
 </tr>

@@ -102,6 +102,12 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
       placeholder: _('Enter total books in series'),
     },
     {
+      field: 'isbn',
+      label: _('ISBN'),
+      value: metadata.isbn || '',
+      placeholder: '9780123456789',
+    },
+    {
       field: 'publisher',
       label: _('Publisher'),
       value: formatPublisher(metadata.publisher || ''),
@@ -125,7 +131,7 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
       field: 'identifier',
       label: _('Identifier'),
       value: metadata.identifier || '',
-      placeholder: '978-0123456789',
+      placeholder: _('Keep existing source identifier'),
     },
   ];
   const metadataFullwidthFields = [
@@ -151,9 +157,10 @@ const BookDetailEdit: React.FC<BookDetailEditProps> = ({
       const selectedFile = result.files[0]!;
       if (selectedFile.path && appService) {
         const filePath = selectedFile.path;
+        const imageUrl = await appService.getCachedImageUrl(filePath);
         onFieldChange('coverImageFile', filePath);
-        onFieldChange('coverImageUrl', await appService.getCachedImageUrl(filePath));
-        setNewCoverImageUrl(filePath);
+        onFieldChange('coverImageUrl', imageUrl);
+        setNewCoverImageUrl(imageUrl);
       } else if (selectedFile.file) {
         const coverImageBlobUrl = URL.createObjectURL(selectedFile.file);
         onFieldChange('coverImageBlobUrl', coverImageBlobUrl);

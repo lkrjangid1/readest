@@ -6,19 +6,37 @@ import { useReaderStore } from '@/store/readerStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { saveViewSettings } from '@/helpers/settings';
-import { getTranslators } from '@/services/translators';
+import {
+  getTranslatorDisplayLabel,
+  getTranslators,
+  isTranslatorAvailable,
+} from '@/services/translators';
 import { useResetViewSettings } from '@/hooks/useResetSettings';
+import { useKeyDownActions } from '@/hooks/useKeyDownActions';
 import { TRANSLATED_LANGS, TRANSLATOR_LANGS } from '@/services/constants';
+import { ConvertChineseVariant } from '@/types/book';
 import { SettingsPanelPanelProp } from './SettingsDialog';
-import { saveAndReload } from '@/utils/reload';
-import Select from '@/components/Select';
+import { getDirFromLanguage } from '@/utils/rtl';
+import { isCJKEnv } from '@/utils/misc';
+import {
+  BoxedList,
+  NavigationRow,
+  SettingsRow,
+  SettingsSelect,
+  SettingsSwitchRow,
+} from './primitives';
+import CustomDictionaries from './CustomDictionaries';
+import WordLensPanel from './WordLensPanel';
+import { PiTranslate } from 'react-icons/pi';
 
 const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset }) => {
   const _ = useTranslation();
   const { token } = useAuth();
   const { envConfig } = useEnv();
-  const { settings, applyUILanguage } = useSettingsStore();
-  const { getViewSettings, setViewSettings } = useReaderStore();
+  const { settings, applyUILanguage, activeSettingsItemId, setActiveSettingsItemId } =
+    useSettingsStore();
+  const { getView, getViewSettings, setViewSettings, recreateViewer } = useReaderStore();
+  const view = getView(bookKey);
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
 
   const [uiLanguage, setUILanguage] = useState(viewSettings.uiLanguage);
@@ -27,6 +45,39 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   const [translateTargetLang, setTranslateTargetLang] = useState(viewSettings.translateTargetLang);
   const [showTranslateSource, setShowTranslateSource] = useState(viewSettings.showTranslateSource);
   const [ttsReadAloudText, setTtsReadAloudText] = useState(viewSettings.ttsReadAloudText);
+  const [replaceQuotationMarks, setReplaceQuotationMarks] = useState(
+    viewSettings.replaceQuotationMarks,
+  );
+  const [convertChineseVariant, setConvertChineseVariant] = useState(
+    viewSettings.convertChineseVariant,
+  );
+  const [showCustomDictionaries, setShowCustomDictionaries] = useState(false);
+  const [showWordLens, setShowWordLens] = useState(false);
+
+  // Android Back / Esc: when a sub-page is open, intercept and step back to the
+  // language list instead of letting <Dialog>'s listener close the whole
+  // Settings dialog. See the matching comment in FontPanel.tsx for the
+  // LIFO-dispatch reasoning.
+  useKeyDownActions({
+    enabled: showCustomDictionaries,
+    onCancel: () => setShowCustomDictionaries(false),
+  });
+  useKeyDownActions({
+    enabled: showWordLens,
+    onCancel: () => setShowWordLens(false),
+  });
+
+  // Deep-link: callers (e.g. the dictionary popup's manage icon) can set
+  // activeSettingsItemId to `'settings.language.dictionaries.manage'` to
+  // jump straight into the Manage Dictionaries sub-page on open. Clear the
+  // id once consumed so SettingsDialog's scroll-to-element fallback
+  // (which runs on a 100ms timeout) doesn't re-fire.
+  useEffect(() => {
+    if (activeSettingsItemId === 'settings.language.dictionaries.manage') {
+      setShowCustomDictionaries(true);
+      setActiveSettingsItemId(null);
+    }
+  }, [activeSettingsItemId, setActiveSettingsItemId]);
 
   const resetToDefaults = useResetViewSettings();
 
@@ -38,6 +89,7 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
       translateTargetLang: setTranslateTargetLang,
       showTranslateSource: setShowTranslateSource,
       ttsReadAloudText: setTtsReadAloudText,
+      replaceQuotationMarks: setReplaceQuotationMarks,
     });
   };
 
@@ -70,25 +122,19 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
   };
 
   const getTranslationProviderOptions = () => {
-    const translators = getTranslators();
-    const availableProviders = translators.map((t) => {
-      let label = t.label;
-      if (t.authRequired && !token) {
-        label = `${label} (${_('Login Required')})`;
-      } else if (t.quotaExceeded) {
-        label = `${label} (${_('Quota Exceeded')})`;
-      }
-      return { value: t.name, label };
-    });
-    return availableProviders;
+    return getTranslators().map((t) => ({
+      value: t.name,
+      label: getTranslatorDisplayLabel(t, !!token, _),
+      // Providers marked `disabled` (e.g. upstream relay is down) stay in the
+      // dropdown so users can see them, but cannot be selected.
+      disabled: !!t.disabled,
+    }));
   };
 
   const getCurrentTranslationProviderOption = () => {
     const value = translationProvider;
     const allProviders = getTranslationProviderOptions();
-    const availableTranslators = getTranslators().filter(
-      (t) => (t.authRequired ? !!token : true) && !t.quotaExceeded,
-    );
+    const availableTranslators = getTranslators().filter((t) => isTranslatorAvailable(t, !!token));
     const currentProvider = availableTranslators.find((t) => t.name === value)
       ? value
       : availableTranslators[0]?.name;
@@ -133,26 +179,43 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
 
   useEffect(() => {
     if (uiLanguage === viewSettings.uiLanguage) return;
-    saveViewSettings(envConfig, bookKey, 'uiLanguage', uiLanguage, false, false);
+    const sameDir = getDirFromLanguage(uiLanguage) === getDirFromLanguage(viewSettings.uiLanguage);
     applyUILanguage(uiLanguage);
+    saveViewSettings(envConfig, bookKey, 'uiLanguage', uiLanguage, false, false).then(() => {
+      if (!sameDir) window.location.reload();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uiLanguage]);
 
   useEffect(() => {
     if (translationEnabled === viewSettings.translationEnabled) return;
-    saveViewSettings(envConfig, bookKey, 'translationEnabled', translationEnabled, true, false);
-    viewSettings.translationEnabled = translationEnabled;
-    setViewSettings(bookKey, { ...viewSettings });
-    if (!showTranslateSource && !translationEnabled) {
-      saveAndReload();
-    }
+    saveViewSettings(
+      envConfig,
+      bookKey,
+      'translationEnabled',
+      translationEnabled,
+      true,
+      false,
+    ).then(() => {
+      if (!showTranslateSource && translationEnabled) {
+        recreateViewer(envConfig, bookKey);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translationEnabled]);
 
   useEffect(() => {
     if (showTranslateSource === viewSettings.showTranslateSource) return;
-    saveViewSettings(envConfig, bookKey, 'showTranslateSource', showTranslateSource, false, false);
-    saveAndReload();
+    saveViewSettings(
+      envConfig,
+      bookKey,
+      'showTranslateSource',
+      showTranslateSource,
+      false,
+      false,
+    ).then(() => {
+      recreateViewer(envConfig, bookKey);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showTranslateSource]);
 
@@ -162,77 +225,178 @@ const LangPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterReset 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ttsReadAloudText]);
 
+  useEffect(() => {
+    if (replaceQuotationMarks === viewSettings.replaceQuotationMarks) return;
+    saveViewSettings(
+      envConfig,
+      bookKey,
+      'replaceQuotationMarks',
+      replaceQuotationMarks,
+      false,
+      false,
+    ).then(() => {
+      recreateViewer(envConfig, bookKey);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replaceQuotationMarks]);
+
+  const getConvertModeOptions: () => { value: ConvertChineseVariant; label: string }[] = () => {
+    return [
+      { value: 'none', label: _('No Conversion') },
+      { value: 's2t', label: _('Simplified to Traditional') },
+      { value: 't2s', label: _('Traditional to Simplified') },
+      { value: 's2tw', label: _('Simplified to Traditional (Taiwan)') },
+      { value: 's2hk', label: _('Simplified to Traditional (Hong Kong)') },
+      { value: 's2twp', label: _('Simplified to Traditional (Taiwan), with phrases') },
+      { value: 'tw2s', label: _('Traditional (Taiwan) to Simplified') },
+      { value: 'hk2s', label: _('Traditional (Hong Kong) to Simplified') },
+      { value: 'tw2sp', label: _('Traditional (Taiwan) to Simplified, with phrases') },
+    ];
+  };
+
+  const getConvertModeOption = () => {
+    const value = convertChineseVariant;
+    const availableOptions = getConvertModeOptions();
+    return availableOptions.find((o) => o.value === value) || availableOptions[0]!;
+  };
+
+  const handleSelectConvertMode = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const option = event.target.value as ConvertChineseVariant;
+    setConvertChineseVariant(option);
+  };
+
+  useEffect(() => {
+    if (convertChineseVariant === viewSettings.convertChineseVariant) return;
+    saveViewSettings(
+      envConfig,
+      bookKey,
+      'convertChineseVariant',
+      convertChineseVariant,
+      false,
+      false,
+    ).then(() => {
+      recreateViewer(envConfig, bookKey);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convertChineseVariant]);
+
+  if (showCustomDictionaries) {
+    return (
+      <div className='my-4 w-full'>
+        <CustomDictionaries onBack={() => setShowCustomDictionaries(false)} />
+      </div>
+    );
+  }
+
+  if (showWordLens) {
+    return <WordLensPanel bookKey={bookKey} onBack={() => setShowWordLens(false)} />;
+  }
+
   return (
     <div className={clsx('my-4 w-full space-y-6')}>
-      <div className='w-full'>
-        <h2 className='mb-2 font-medium'>{_('Language')}</h2>
-        <div className='card border-base-200 bg-base-100 border shadow'>
-          <div className='divide-base-200 divide-y'>
-            <div className='config-item'>
-              <span className=''>{_('Interface Language')}</span>
-              <Select
-                value={getCurrentUILangOption().value}
-                onChange={handleSelectUILang}
-                options={getLangOptions(TRANSLATED_LANGS)}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      <BoxedList title={_('Language')} data-setting-id='settings.language.interfaceLanguage'>
+        <SettingsRow label={_('Language')}>
+          <SettingsSelect
+            value={getCurrentUILangOption().value}
+            onChange={handleSelectUILang}
+            ariaLabel={_('Language')}
+            options={getLangOptions(TRANSLATED_LANGS)}
+          />
+        </SettingsRow>
+      </BoxedList>
 
-      <div className='w-full'>
-        <h2 className='mb-2 font-medium'>{_('Translation')}</h2>
-        <div className='card border-base-200 bg-base-100 border shadow'>
-          <div className='divide-base-200'>
-            <div className='config-item'>
-              <span className=''>{_('Enable Translation')}</span>
-              <input
-                type='checkbox'
-                className='toggle'
-                checked={translationEnabled}
-                onChange={() => setTranslationEnabled(!translationEnabled)}
-              />
-            </div>
+      <BoxedList
+        title={_('Dictionaries')}
+        data-setting-id='settings.language.dictionaries'
+        cardClassName='overflow-hidden'
+      >
+        <NavigationRow
+          title={_('Manage Dictionaries')}
+          onClick={() => setShowCustomDictionaries(true)}
+          className='h-14'
+        />
+      </BoxedList>
 
-            <div className='config-item'>
-              <span className=''>{_('Show Source Text')}</span>
-              <input
-                type='checkbox'
-                className='toggle'
-                checked={showTranslateSource}
-                onChange={() => setShowTranslateSource(!showTranslateSource)}
-              />
-            </div>
+      <BoxedList
+        title={_('Word Lens')}
+        data-setting-id='settings.language.wordlens'
+        cardClassName='overflow-hidden'
+      >
+        <NavigationRow
+          icon={PiTranslate}
+          title={_('Word Lens')}
+          status={_('Show a short native-language hint above difficult words.')}
+          onClick={() => setShowWordLens(true)}
+        />
+      </BoxedList>
 
-            <div className='config-item'>
-              <span className=''>{_('TTS Text')}</span>
-              <Select
-                value={ttsReadAloudText}
-                onChange={handleSelectTTSText}
-                options={getTTSTextOptions()}
-              />
-            </div>
+      <BoxedList title={_('Translation')} data-setting-id='settings.language.translationEnabled'>
+        <SettingsSwitchRow
+          label={_('Enable Translation')}
+          checked={translationEnabled}
+          onChange={() => setTranslationEnabled(!translationEnabled)}
+          disabled={!bookKey}
+        />
+        <SettingsSwitchRow
+          label={_('Show Source Text')}
+          checked={showTranslateSource}
+          onChange={() => setShowTranslateSource(!showTranslateSource)}
+        />
+        <SettingsRow label={_('TTS Text')} data-setting-id='settings.language.ttsTextTranslation'>
+          <SettingsSelect
+            value={ttsReadAloudText}
+            onChange={handleSelectTTSText}
+            ariaLabel={_('TTS Text')}
+            options={getTTSTextOptions()}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label={_('Translation Service')}
+          data-setting-id='settings.language.translationProvider'
+        >
+          <SettingsSelect
+            value={getCurrentTranslationProviderOption().value}
+            onChange={handleSelectTranslationProvider}
+            ariaLabel={_('Translation Service')}
+            options={getTranslationProviderOptions()}
+          />
+        </SettingsRow>
+        <SettingsRow label={_('Translate To')} data-setting-id='settings.language.targetLanguage'>
+          <SettingsSelect
+            value={getCurrentTargetLangOption().value}
+            onChange={handleSelectTargetLang}
+            ariaLabel={_('Translate To')}
+            options={getLangOptions(TRANSLATOR_LANGS)}
+          />
+        </SettingsRow>
+      </BoxedList>
 
-            <div className='config-item'>
-              <span className=''>{_('Translation Service')}</span>
-              <Select
-                value={getCurrentTranslationProviderOption().value}
-                onChange={handleSelectTranslationProvider}
-                options={getTranslationProviderOptions()}
-              />
-            </div>
+      {(isCJKEnv() || view?.language.isCJK) && (
+        <BoxedList title={_('Punctuation')} data-setting-id='settings.language.quotationMarks'>
+          <SettingsSwitchRow
+            label={_('Replace Quotation Marks')}
+            description={_('Enabled only in vertical layout.')}
+            checked={replaceQuotationMarks}
+            onChange={() => setReplaceQuotationMarks(!replaceQuotationMarks)}
+          />
+        </BoxedList>
+      )}
 
-            <div className='config-item'>
-              <span className=''>{_('Translate To')}</span>
-              <Select
-                value={getCurrentTargetLangOption().value}
-                onChange={handleSelectTargetLang}
-                options={getLangOptions(TRANSLATOR_LANGS)}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
+      {(isCJKEnv() || view?.language.isCJK) && (
+        <BoxedList
+          title={_('Convert Simplified and Traditional Chinese')}
+          data-setting-id='settings.language.chineseConversion'
+        >
+          <SettingsRow label={_('Convert Mode')}>
+            <SettingsSelect
+              value={getConvertModeOption().value}
+              onChange={handleSelectConvertMode}
+              ariaLabel={_('Convert Mode')}
+              options={getConvertModeOptions()}
+            />
+          </SettingsRow>
+        </BoxedList>
+      )}
     </div>
   );
 };
