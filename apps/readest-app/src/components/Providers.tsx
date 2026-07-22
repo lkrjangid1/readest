@@ -3,7 +3,7 @@
 import '@/utils/polyfill';
 import posthog from 'posthog-js';
 import i18n from '@/i18n/i18n';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { IconContext } from 'react-icons';
 import { AuthProvider } from '@/context/AuthContext';
 import { useEnv } from '@/context/EnvContext';
@@ -36,7 +36,6 @@ import AtmosphereOverlay from '@/components/AtmosphereOverlay';
 import AppLockScreen from '@/components/AppLockScreen';
 import AppLockDialog from '@/components/settings/AppLockDialog';
 import PassphrasePrompt from '@/components/PassphrasePrompt';
-import TelemetryConsentDialog from '@/components/TelemetryConsentDialog';
 import { upgradeToKeychainIfAvailable } from '@/libs/crypto/passphrase';
 import { cryptoSession } from '@/libs/crypto/session';
 import { useAppLockStore } from '@/store/appLockStore';
@@ -112,7 +111,6 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
     initialize: initializeAppLock,
   } = useAppLockStore();
   const iconSize = useDefaultIconSize();
-  const [showTelemetryConsent, setShowTelemetryConsent] = useState(false);
   useSafeAreaInsets(); // Initialize safe area insets
   useSettingsSync(); // Adopt global settings broadcast by other windows (#4580)
 
@@ -148,7 +146,7 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
           appService,
           settings,
           isNewUser: !hadSettingsFile,
-          onShowPrompt: () => setShowTelemetryConsent(true),
+          onShowPrompt: () => {},
         });
         applyUILanguage(globalViewSettings.uiLanguage);
         // Seed the customTextureStore with the disk-loaded textures (preserving
@@ -244,10 +242,6 @@ const Providers = ({ children }: { children: React.ReactNode }) => {
                   <PassphrasePrompt />
                 </div>
                 <AppLockDialog />
-                <TelemetryConsentDialog
-                  open={showTelemetryConsent}
-                  onClose={() => setShowTelemetryConsent(false)}
-                />
                 {showAppLockScreen && <AppLockScreen />}
               </CommandPaletteProvider>
             </DropdownProvider>

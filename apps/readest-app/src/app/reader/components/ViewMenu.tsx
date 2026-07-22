@@ -6,7 +6,7 @@ import { BiMoon, BiSun } from 'react-icons/bi';
 import { TbSunMoon } from 'react-icons/tb';
 import { MdZoomOut, MdZoomIn, MdCheck, MdInfoOutline } from 'react-icons/md';
 import { MdRemove, MdAdd, MdContrast } from 'react-icons/md';
-import { MdSync, MdSyncProblem } from 'react-icons/md';
+import { MdSync } from 'react-icons/md';
 import { IoMdExpand } from 'react-icons/io';
 import { IoShareOutline } from 'react-icons/io5';
 import { TbArrowAutofitWidth } from 'react-icons/tb';
@@ -414,36 +414,6 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
-      <MenuItem
-        label={
-          !user
-            ? _('Sign in to Sync')
-            : lastSyncTime
-              ? _('Synced {{time}}', {
-                  time: dayjs(lastSyncTime).fromNow(),
-                })
-              : _('Never synced')
-        }
-        Icon={user ? MdSync : MdSyncProblem}
-        iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
-        onClick={handleSync}
-        siblings={
-          <button
-            aria-label={_('Sync Info')}
-            title={_('Sync Info')}
-            className='hover:bg-base-300 text-base-content/70 mx-1 rounded-md px-2'
-            onClick={() => {
-              setIsDropdownOpen?.(false);
-              onShowMetaHashDialog?.();
-            }}
-          >
-            <MdInfoOutline size={16} />
-          </button>
-        }
-      />
-
-      <hr aria-hidden='true' className='border-base-300 my-1' />
-
       {appService?.hasWindow && <MenuItem label={_('Fullscreen')} onClick={handleFullScreen} />}
       <MenuItem
         label={
@@ -471,8 +441,6 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
       />
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
-
-      <MenuItem label={_('Share Book')} Icon={IoShareOutline} onClick={handleShare} />
     </Menu>
   );
 };

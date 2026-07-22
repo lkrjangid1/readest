@@ -7,6 +7,7 @@ import { SyncProvider } from '@/context/SyncContext';
 import Reader from '@/app/reader/components/Reader';
 import { useEnv } from '@/context/EnvContext';
 import { useLibraryStore } from '@/store/libraryStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { Book } from '@/types/book';
 
 const DEFAULT_FILE_SERVER_PORT = '6391';
@@ -118,7 +119,9 @@ function ReadEntryContent() {
       const importSource = buildImportSource(normalizedPath);
       if (!importSource) throw new Error('Invalid file path provided.');
 
-      const imported = await appService.importBook(importSource, library, true, true, false, false);
+      // saveBook/saveCover default true, overwrite/transient default false —
+      // matches the fork's original positional args (true, true, false, false).
+      const imported = await appService.importBook(importSource, library);
       if (!imported) {
         throw new Error('Failed to import the requested book.');
       }
@@ -145,6 +148,14 @@ function ReadEntryContent() {
       setIsImporting(true);
       setError(null);
       try {
+        // The fork's import path calls setLibrary() (→ libraryLoaded = true),
+        // which makes Reader's useLibrary hook skip its own init and therefore
+        // never load settings. Reader gates rendering on
+        // `libraryLoaded && settings.globalReadSettings`, so load settings into
+        // the store here — otherwise the reader stays on a blank placeholder.
+        const loadedSettings = await appService.loadSettings();
+        useSettingsStore.getState().setSettings(loadedSettings);
+
         let targetBook: Book | null = null;
 
         if (parsedQueries.bookId) {

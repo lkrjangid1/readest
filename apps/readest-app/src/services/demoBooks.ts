@@ -8,7 +8,9 @@ export const demoLibraries = {
   zh: libraryZh,
 };
 
-const demoBookUrls = new Set([...libraryEn.library, ...libraryZh.library]);
+// Explicit element type: the Flutter fork ships empty demo libraries (no
+// readest sample books in the app), so the spread would otherwise infer never[].
+const demoBookUrls = new Set<string>([...libraryEn.library, ...libraryZh.library]);
 
 /**
  * Demo books are the sample shelf an anonymous web visitor gets (issue #5049).

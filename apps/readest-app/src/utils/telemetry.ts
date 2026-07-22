@@ -1,5 +1,3 @@
-import posthog from 'posthog-js';
-
 export const TELEMETRY_OPT_OUT_KEY = 'readest-telemetry-opt-out';
 export const TELEMETRY_DECISION_KEY = 'readest-telemetry-decision';
 
@@ -28,19 +26,17 @@ export const rollIntoTelemetryPromptBucket = (rng: () => number = Math.random) =
   return rng() < TELEMETRY_PROMPT_BUCKET_RATE;
 };
 
-export const captureEvent = (event: string, properties?: Record<string, unknown>) => {
-  if (!hasOptedOutTelemetry()) {
-    posthog.capture(event, properties);
-  }
+// Tracking removed: telemetry is disabled in this fork, so event capture is a
+// no-op and the opt-in/out toggles only persist the local decision (no PostHog).
+export const captureEvent = (_event: string, _properties?: Record<string, unknown>) => {
+  // no-op: tracking removed
 };
 
 export const optInTelemetry = () => {
   localStorage.setItem(TELEMETRY_OPT_OUT_KEY, 'false');
   setTelemetryDecision('opt-in');
-  posthog.opt_in_capturing();
 };
 export const optOutTelemetry = () => {
   localStorage.setItem(TELEMETRY_OPT_OUT_KEY, 'true');
   setTelemetryDecision('opt-out');
-  posthog.opt_out_capturing();
 };

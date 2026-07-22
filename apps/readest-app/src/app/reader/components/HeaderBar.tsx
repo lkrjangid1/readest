@@ -307,17 +307,6 @@ const HeaderBar: React.FC<HeaderBarProps> = ({
               />
             </ModalPortal>
           )}
-          <WindowButtons
-            className='window-buttons flex items-center'
-            headerRef={headerRef}
-            showMinimize={bookKeys.length == 1 && windowButtonVisible}
-            showMaximize={bookKeys.length == 1 && windowButtonVisible}
-            closeButtonLabel={_('Close Book')}
-            onClose={() => {
-              setHoveredBookKey(null);
-              onCloseBook(bookKey);
-            }}
-          />
         </div>
       </div>
     </div>

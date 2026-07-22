@@ -13,6 +13,10 @@ if (isDev) {
   initOpenNextCloudflareForDev();
 }
 
+// The Flutter embed builds with NEXT_PUBLIC_APP_PLATFORM='flutter': a non-'web'
+// value so it statically exports (like the Tauri build), while getAppService()
+// still returns the browser WebAppService (the WebView is not Tauri). See
+// `build-flutter` / `.env.flutter`.
 const exportOutput = appPlatform !== 'web' && !isDev;
 // Opt-in standalone output, set only by the Docker production build
 // (Dockerfile). Every other path keeps the original behavior: Tauri `export`,
