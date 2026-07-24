@@ -81,8 +81,10 @@ const ProfilePage = () => {
     const isAuthenticated = user && token && appService;
     if (isAuthenticated) return;
 
+    // Sign-in is removed from this build; the /auth route is gone. Send an
+    // unauthenticated visitor back to the library instead of bouncing to /auth.
     const timer = setTimeout(() => {
-      router.push('/auth?redirect=/library');
+      router.replace('/library');
     }, 1000);
 
     return () => clearTimeout(timer);

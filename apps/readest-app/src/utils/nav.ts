@@ -106,16 +106,14 @@ export const navigateToReader = (
   }
 };
 
-export const navigateToLogin = (router: ReturnType<typeof useRouter>) => {
-  const pathname = window.location.pathname;
-  const search = window.location.search;
-  const currentPath = pathname !== '/auth' ? pathname + search : '/';
-  router.push(`/auth?redirect=${encodeURIComponent(currentPath)}`);
-};
+// Sign-in has been removed from this build, so the /auth (and /user, which
+// bounces to /auth) routes no longer have a purpose. These navigation helpers
+// are intentionally no-ops: nothing may route the WebView to the removed auth
+// pages. In the Flutter embed a hard navigation to /auth is served by the
+// static asset server as a non-200, surfacing ERR_HTTP_RESPONSE_CODE_FAILURE.
+export const navigateToLogin = (_router: ReturnType<typeof useRouter>) => {};
 
-export const navigateToProfile = (router: ReturnType<typeof useRouter>) => {
-  router.push('/user');
-};
+export const navigateToProfile = (_router: ReturnType<typeof useRouter>) => {};
 
 export const navigateToLibrary = (
   router: ReturnType<typeof useRouter>,
@@ -157,16 +155,8 @@ export const redirectToLibrary = () => {
   redirect('/library');
 };
 
-export const navigateToResetPassword = (router: ReturnType<typeof useRouter>) => {
-  const pathname = window.location.pathname;
-  const search = window.location.search;
-  const currentPath = pathname !== '/auth' ? pathname + search : '/';
-  router.push(`/auth/recovery?redirect=${encodeURIComponent(currentPath)}`);
-};
+// See navigateToLogin: the auth routes are gone, so password recovery/update
+// navigation is a no-op too.
+export const navigateToResetPassword = (_router: ReturnType<typeof useRouter>) => {};
 
-export const navigateToUpdatePassword = (router: ReturnType<typeof useRouter>) => {
-  const pathname = window.location.pathname;
-  const search = window.location.search;
-  const currentPath = pathname !== '/auth' ? pathname + search : '/';
-  router.push(`/auth/update?redirect=${encodeURIComponent(currentPath)}`);
-};
+export const navigateToUpdatePassword = (_router: ReturnType<typeof useRouter>) => {};

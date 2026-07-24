@@ -622,7 +622,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           saveSettings(envConfig, settings);
         }
       } else if (settings.keepLogin) {
-        router.push('/auth');
+        // Sign-in is removed from this build; never bounce to the (gone) /auth
+        // route. Clear the stale keepLogin flag so sync stops treating this as
+        // a logged-out-but-should-be-logged-in state.
+        settings.keepLogin = false;
+        setSettings(settings);
+        saveSettings(envConfig, settings);
       }
     };
 
