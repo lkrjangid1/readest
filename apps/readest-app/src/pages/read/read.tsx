@@ -9,6 +9,7 @@ import { useEnv } from '@/context/EnvContext';
 import { useLibraryStore } from '@/store/libraryStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { Book } from '@/types/book';
+import { shouldRunReaderEntry } from './entryGate';
 
 const DEFAULT_FILE_SERVER_PORT = '6391';
 
@@ -144,7 +145,18 @@ function ReadEntryContent() {
   }, [router.query]);
 
   useEffect(() => {
-    if (!router.isReady || isImporting || hasHydrated) return;
+    if (
+      !shouldRunReaderEntry({
+        routerReady: router.isReady,
+        isImporting,
+        hasHydrated,
+        error,
+        file: parsedQueries.file,
+        bookId: parsedQueries.bookId,
+      })
+    ) {
+      return;
+    }
     if (!appService) return;
 
     const run = async () => {
@@ -199,6 +211,7 @@ function ReadEntryContent() {
     importFromPath,
     hasHydrated,
     isImporting,
+    error,
   ]);
 
   useEffect(() => {
