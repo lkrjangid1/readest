@@ -422,6 +422,12 @@ window.FlutterReaderAPI = {
   getBooknotes() {
     return this._bridge()?.getBooknotes() ?? [];
   },
+  getReaderState() {
+    return this._bridge()?.getState() ?? null;
+  },
+  async readerAction(name, arg) {
+    return (await this._bridge()?.action(name, arg)) ?? false;
+  },
 
   // Close current book
   closeBook() {

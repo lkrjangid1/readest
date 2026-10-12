@@ -6,6 +6,11 @@ import { useThemeStore } from '@/store/themeStore';
 import { saveViewSettings } from '@/helpers/settings';
 import { getStyles } from '@/utils/style';
 import { getMaxInlineSize } from '@/utils/config';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useSidebarStore } from '@/store/sidebarStore';
+import { useNotebookStore } from '@/store/notebookStore';
+import { eventDispatcher } from '@/utils/event';
+import { SERIF_FONTS, SANS_SERIF_FONTS, NON_FREE_FONTS } from '@/services/constants';
 import type { TOCItem } from '@/libs/document';
 
 const MAX_MARGIN_PX = 88;
@@ -32,6 +37,10 @@ type Bridge = {
   hideChrome: (hidden: boolean) => boolean;
   getProgress: () => Record<string, unknown> | null;
   getBooknotes: () => Record<string, unknown>[];
+  /** Live reader state for the Flutter chrome (bookmark, TTS, overlays…). */
+  getState: () => Record<string, unknown>;
+  /** Runs one of the web reader's own features (see `actions`). */
+  action: (name: string, arg?: unknown) => Promise<boolean>;
 };
 
 declare global {
@@ -44,9 +53,9 @@ type FlutterHost = { callHandler: (name: string, data?: unknown) => Promise<unkn
 const flutterHost = (): FlutterHost | undefined =>
   (window as unknown as { flutter_inappwebview?: FlutterHost }).flutter_inappwebview;
 
-const callFlutter = (name: string) => {
+const callFlutter = (name: string, data?: unknown) => {
   flutterHost()
-    ?.callHandler(name)
+    ?.callHandler(name, data)
     .catch(() => {});
 };
 
@@ -69,15 +78,144 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
     const reader = () => useReaderStore.getState();
 
+    const overlayOpen = () =>
+      useSidebarStore.getState().isSideBarVisible ||
+      useNotebookStore.getState().isNotebookVisible ||
+      useSettingsStore.getState().isSettingsDialogOpen;
+
     const unsubscribe = useReaderStore.subscribe((state, prev) => {
       if (!chromeHidden) return;
       // The web reader just tried to show its bars (a tap in the middle):
       // keep them hidden and let Flutter toggle its own chrome instead.
       if (state.hoveredBookKey && state.hoveredBookKey !== prev.hoveredBookKey) {
         state.setHoveredBookKey(null);
-        callFlutter('onCenterTap');
+        // Closing the sidebar also sets it; that isn't a page tap.
+        if (!overlayOpen()) callFlutter('onCenterTap');
       }
     });
+
+    // Read-aloud state changes, so the Listen button can follow them.
+    const onTtsState = (e: CustomEvent) => {
+      const d = e.detail as { bookKey?: string; state?: string } | undefined;
+      if (!d || d.bookKey === bookKey) callFlutter('onReaderState', { tts: d?.state });
+    };
+    eventDispatcher.on('tts-playback-state', onTtsState);
+
+    const freeFont = (f: string) => !NON_FREE_FONTS.includes(f);
+
+    const actions: Record<string, (arg?: unknown) => Promise<boolean> | boolean> = {
+      toggleBookmark: () => {
+        eventDispatcher.dispatch('toggle-bookmark', { bookKey });
+        return true;
+      },
+      search: (term) => {
+        eventDispatcher.dispatch('search-term', {
+          term: typeof term === 'string' && term ? term : null,
+          bookKey,
+        });
+        return true;
+      },
+      tts: () => {
+        const on = !!reader().getViewState(bookKey)?.ttsEnabled;
+        eventDispatcher.dispatch(on ? 'tts-stop' : 'tts-speak', { bookKey });
+        return true;
+      },
+      ttsPause: () => {
+        eventDispatcher.dispatch('tts-toggle-play', { bookKey });
+        return true;
+      },
+      settings: (panel) => {
+        const st = useSettingsStore.getState();
+        st.setRequestedPanel(typeof panel === 'string' ? panel : null);
+        st.setSettingsDialogBookKey(bookKey);
+        st.setSettingsDialogOpen(true);
+        return true;
+      },
+      sidebar: (tab) => {
+        const sb = useSidebarStore.getState();
+        const config = useBookDataStore.getState().getConfig(bookKey);
+        if (config && typeof tab === 'string') {
+          useBookDataStore.getState().setConfig(bookKey, {
+            viewSettings: { ...config.viewSettings!, sideBarTab: tab },
+          });
+        }
+        // The sidebar reads its tab when it mounts, so reopen it.
+        sb.setSideBarVisible(false);
+        sb.setSideBarBookKey(bookKey);
+        setTimeout(() => useSidebarStore.getState().setSideBarVisible(true), 0);
+        return true;
+      },
+      notebook: () => {
+        useSidebarStore.getState().setSideBarBookKey(bookKey);
+        useNotebookStore.getState().setNotebookVisible(true);
+        return true;
+      },
+      prevPage: () => !!reader().getView(bookKey)?.renderer.prev(),
+      nextPage: () => !!reader().getView(bookKey)?.renderer.next(),
+      prevSection: () => {
+        reader().getView(bookKey)?.renderer.prevSection?.();
+        return true;
+      },
+      nextSection: () => {
+        reader().getView(bookKey)?.renderer.nextSection?.();
+        return true;
+      },
+      back: () => {
+        reader().getView(bookKey)?.history.back();
+        return true;
+      },
+      forward: () => {
+        reader().getView(bookKey)?.history.forward();
+        return true;
+      },
+      paragraphMode: () => {
+        eventDispatcher.dispatch('toggle-paragraph-mode', { bookKey });
+        return true;
+      },
+      speedReading: () => {
+        eventDispatcher.dispatch('rsvp-start', { bookKey });
+        return true;
+      },
+      autoScroll: () => {
+        eventDispatcher.dispatch('autoscroll-toggle', { bookKey });
+        return true;
+      },
+      font: async (arg) => {
+        const name = String(arg ?? '');
+        if (SANS_SERIF_FONTS.includes(name)) {
+          await saveViewSettings(envConfig, bookKey, 'sansSerifFont', name);
+          await saveViewSettings(envConfig, bookKey, 'defaultFont', 'Sans-serif');
+        } else {
+          await saveViewSettings(envConfig, bookKey, 'serifFont', name);
+          await saveViewSettings(envConfig, bookKey, 'defaultFont', 'Serif');
+        }
+        return true;
+      },
+      // Android back: close the web reader's own panels first.
+      closeOverlays: () => {
+        let closed = false;
+        const sb = useSidebarStore.getState();
+        if (useSettingsStore.getState().isSettingsDialogOpen) {
+          useSettingsStore.getState().setSettingsDialogOpen(false);
+          closed = true;
+        }
+        if (useNotebookStore.getState().isNotebookVisible) {
+          useNotebookStore.getState().setNotebookVisible(false);
+          closed = true;
+        }
+        if (sb.isSideBarVisible) {
+          sb.setSideBarVisible(false);
+          closed = true;
+        }
+        if (sb.isSearchBarVisible) {
+          sb.clearSearch(bookKey);
+          sb.setSearchBarVisible(false);
+          reader().getView(bookKey)?.clearSearch?.();
+          closed = true;
+        }
+        return closed;
+      },
+    };
 
     const flatten = (items: TOCItem[] | undefined, level: number, current?: string) =>
       (items ?? []).flatMap(
@@ -180,6 +318,33 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         };
       },
 
+      getState: () => {
+        const viewState = reader().getViewState(bookKey);
+        const vs = reader().getViewSettings(bookKey);
+        const view = reader().getView(bookKey);
+        return {
+          bookmarked: !!viewState?.ribbonVisible,
+          ttsEnabled: !!viewState?.ttsEnabled,
+          autoScroll: !!viewState?.autoScrollEnabled,
+          paragraphMode: !!vs?.paragraphMode?.enabled,
+          fixedLayout: !!useBookDataStore.getState().getBookData(bookKey)?.isFixedLayout,
+          canGoBack: !!view?.history?.canGoBack,
+          canGoForward: !!view?.history?.canGoForward,
+          overlayOpen: overlayOpen(),
+          defaultFont: vs?.defaultFont ?? 'Serif',
+          serifFont: vs?.serifFont ?? '',
+          sansSerifFont: vs?.sansSerifFont ?? '',
+          serifFonts: SERIF_FONTS.filter(freeFont),
+          sansSerifFonts: SANS_SERIF_FONTS.filter(freeFont),
+        };
+      },
+
+      action: async (name, arg) => {
+        const fn = actions[name];
+        if (!fn) return false;
+        return !!(await fn(arg));
+      },
+
       getBooknotes: () =>
         (useBookDataStore.getState().getConfig(bookKey)?.booknotes ?? [])
           .filter((n) => !n.deletedAt && n.cfi)
@@ -198,6 +363,7 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     callFlutter('onReaderBridgeReady');
     return () => {
       unsubscribe();
+      eventDispatcher.off('tts-playback-state', onTtsState);
       if (window.__readestFlutterBridge === bridge) delete window.__readestFlutterBridge;
     };
   }, [bookKey, envConfig]);
