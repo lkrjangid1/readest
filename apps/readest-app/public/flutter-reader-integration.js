@@ -397,6 +397,32 @@ window.FlutterReaderAPI = {
     }
   },
 
+  // ── Live reader (registered by the React FlutterBridge per open book) ──
+  _bridge() {
+    return window.__readestFlutterBridge || null;
+  },
+  getToc() {
+    return this._bridge()?.getToc() ?? [];
+  },
+  getViewSettings() {
+    return this._bridge()?.getViewSettings() ?? null;
+  },
+  async setViewSettings(partial) {
+    return (await this._bridge()?.setViewSettings(partial || {})) ?? false;
+  },
+  async goTo(target) {
+    return (await this._bridge()?.goTo(target)) ?? false;
+  },
+  hideChrome(hidden) {
+    return this._bridge()?.hideChrome(!!hidden) ?? false;
+  },
+  getReaderProgress() {
+    return this._bridge()?.getProgress() ?? null;
+  },
+  getBooknotes() {
+    return this._bridge()?.getBooknotes() ?? [];
+  },
+
   // Close current book
   closeBook() {
     this.currentBook = null;

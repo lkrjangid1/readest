@@ -26,6 +26,7 @@ import HintInfo from './HintInfo';
 import ReadingRuler from './ReadingRuler';
 import DoubleBorder from './DoubleBorder';
 import ReadingStatsTracker from './ReadingStatsTracker';
+import FlutterBridge from './FlutterBridge';
 
 interface BooksGridProps {
   bookKeys: string[];
@@ -261,6 +262,7 @@ const BookCellInner: React.FC<BookCellProps> = ({
         gridInsets={gridInsets}
       />
       <ReadingStatsTracker bookKey={bookKey} />
+      <FlutterBridge bookKey={bookKey} />
     </div>
   );
 };
