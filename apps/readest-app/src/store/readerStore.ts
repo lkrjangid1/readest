@@ -30,6 +30,7 @@ import { BookData, useBookDataStore } from './bookDataStore';
 import { useLibraryStore } from './libraryStore';
 import { clearBookProgress, getBookProgress, setBookProgress } from './readerProgressStore';
 import { uniqueId } from '@/utils/misc';
+import { trackFlutterSection } from '@/utils/flutterSectionNotifier';
 
 type FlutterProgressPayload = {
   progress: [number, number];
@@ -617,6 +618,10 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
     // Mirror the latest progress to the Flutter host so it can persist it
     // outside the WebView (ReadingProgressService / Larse).
     notifyFlutterAboutProgress(progress, bookData.book?.filePath);
+    // Tell Flutter when the reader moves on from a finished chapter.
+    if (viewState.isPrimary) {
+      trackFlutterSection(key, bookData, get().getView(key), tocItem, section, fraction);
+    }
 
     // Write progress to the standalone store. This is the only setState on
     // the hot swipe path that the previous implementation routed through

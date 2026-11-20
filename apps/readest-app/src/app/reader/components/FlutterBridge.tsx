@@ -12,6 +12,7 @@ import { useNotebookStore } from '@/store/notebookStore';
 import { eventDispatcher } from '@/utils/event';
 import { SERIF_FONTS, SANS_SERIF_FONTS, NON_FREE_FONTS } from '@/services/constants';
 import type { TOCItem } from '@/libs/document';
+import { forgetFlutterSection, getSectionSample } from '@/utils/flutterSectionNotifier';
 
 const MAX_MARGIN_PX = 88;
 const MAX_GAP_PERCENT = 10;
@@ -41,6 +42,8 @@ type Bridge = {
   getState: () => Record<string, unknown>;
   /** Runs one of the web reader's own features (see `actions`). */
   action: (name: string, arg?: unknown) => Promise<boolean>;
+  /** A quote from the chapter just finished (see onSectionChange), or null. */
+  getSectionSample: () => Promise<string | null>;
 };
 
 declare global {
@@ -345,6 +348,9 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         return !!(await fn(arg));
       },
 
+      getSectionSample: () =>
+        getSectionSample(bookKey, useBookDataStore.getState().getBookData(bookKey)),
+
       getBooknotes: () =>
         (useBookDataStore.getState().getConfig(bookKey)?.booknotes ?? [])
           .filter((n) => !n.deletedAt && n.cfi)
@@ -363,6 +369,7 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
     callFlutter('onReaderBridgeReady');
     return () => {
       unsubscribe();
+      forgetFlutterSection(bookKey);
       eventDispatcher.off('tts-playback-state', onTtsState);
       if (window.__readestFlutterBridge === bridge) delete window.__readestFlutterBridge;
     };

@@ -428,6 +428,10 @@ window.FlutterReaderAPI = {
   async readerAction(name, arg) {
     return (await this._bridge()?.action(name, arg)) ?? false;
   },
+  async getSectionSample() {
+    const b = this._bridge();
+    return b && b.getSectionSample ? (await b.getSectionSample()) ?? null : null;
+  },
 
   // Close current book
   closeBook() {
