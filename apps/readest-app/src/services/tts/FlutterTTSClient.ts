@@ -73,6 +73,9 @@ export class FlutterTTSClient implements TTSClient {
   #rate = 1.0;
   #pitch = 1.0;
   #utterances = new Map<string, Utterance>();
+  // Bumped by stop(): a speak() started before it must not go on to the
+  // next sentence (pause stops the client before the controller aborts).
+  #stopEpoch = 0;
 
   constructor(controller?: TTSController) {
     this.controller = controller;
@@ -171,7 +174,9 @@ export class FlutterTTSClient implements TTSClient {
 
   async *speak(ssml: string, signal: AbortSignal, preload = false) {
     const { marks } = parseSSMLMarks(ssml, this.#primaryLang);
+    const epoch = this.#stopEpoch;
     for (const mark of marks) {
+      if (signal.aborted || epoch !== this.#stopEpoch) return;
       if (!preload) this.controller?.dispatchSpeakMark(mark);
       for await (const event of this.speakMark(mark, preload, signal)) {
         if (signal.aborted) {
@@ -203,6 +208,7 @@ export class FlutterTTSClient implements TTSClient {
   }
 
   async stop() {
+    this.#stopEpoch++;
     try {
       await Promise.race([
         this.#call('ttsStop'),

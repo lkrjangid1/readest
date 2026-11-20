@@ -127,6 +127,26 @@ describe('FlutterTTSClient', () => {
     expect(calls.some((c) => c.name === 'ttsStop')).toBe(true);
   });
 
+  test('pause (stop before the abort) does not speak the next sentence', async () => {
+    win.flutter_inappwebview!.callHandler = vi.fn(async (name: string, data?: unknown) => {
+      calls.push({ name, data });
+      return { success: true }; // the first sentence never ends on its own
+    });
+    const client = new FlutterTTSClient({ dispatchSpeakMark: vi.fn() } as never);
+    await client.init();
+    const ac = new AbortController();
+    const run = (async () => {
+      for await (const _ of client.speak(ssml, ac.signal)) void _;
+    })();
+    await new Promise((r) => setTimeout(r, 10));
+    // The controller's pause(): the client stops first, the abort comes later.
+    await client.pause();
+    await new Promise((r) => setTimeout(r, 20));
+    ac.abort();
+    await run;
+    expect(calls.filter((c) => c.name === 'ttsSpeak')).toHaveLength(1);
+  });
+
   test('lists phone voices for the language and picks the saved one', async () => {
     const client = new FlutterTTSClient();
     await client.init();

@@ -4,6 +4,7 @@ import { deeplProvider } from './deepl';
 import { azureProvider } from './azure';
 import { googleProvider } from './google';
 import { yandexProvider } from './yandex';
+import { flutterProvider } from './flutter';
 
 function createTranslator<T extends string>(
   name: T,
@@ -21,12 +22,14 @@ const deeplTranslator = createTranslator('deepl', deeplProvider);
 const azureTranslator = createTranslator('azure', azureProvider);
 const googleTranslator = createTranslator('google', googleProvider);
 const yandexTranslator = createTranslator('yandex', yandexProvider);
+const flutterTranslator = createTranslator('flutter', flutterProvider);
 
 const availableTranslators = [
   deeplTranslator,
   azureTranslator,
   googleTranslator,
   yandexTranslator,
+  flutterTranslator,
   // Add more translators here
 ];
 
@@ -34,15 +37,19 @@ export type TranslatorName = (typeof availableTranslators)[number]['name'];
 
 /**
  * Providers offered inside the Flutter app: no Readest account there (DeepL
- * needs one) and the Edge token endpoint Azure relies on is gone, so only
- * the keyless Google endpoint is listed.
+ * needs one) and the Edge token endpoint Azure relies on is gone. The app
+ * translates natively through its `translate` bridge handler (the
+ * `translator` package), falling back to the keyless Google endpoints.
  */
-export const EMBEDDED_TRANSLATORS: TranslatorName[] = ['google'];
+export const EMBEDDED_TRANSLATORS: TranslatorName[] = ['flutter'];
+
+/** Only works with the Flutter bridge: never listed elsewhere. */
+const FLUTTER_ONLY_TRANSLATORS: TranslatorName[] = ['flutter'];
 
 const listedTranslators = () =>
   isFlutterHost()
     ? availableTranslators.filter((t) => EMBEDDED_TRANSLATORS.includes(t.name))
-    : availableTranslators;
+    : availableTranslators.filter((t) => !FLUTTER_ONLY_TRANSLATORS.includes(t.name));
 
 export const getTranslator = (name: TranslatorName): TranslationProvider | undefined => {
   return listedTranslators().find((translator) => translator.name === name);

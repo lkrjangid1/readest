@@ -29,19 +29,24 @@ import { getTargetLang, isCJKEnv } from '@/utils/misc';
 import { safeLoadJSON, safeSaveJSON } from './persistence';
 import { isFlutterHost } from '@/utils/flutterHost';
 
+const EMBEDDED_TRANSLATOR = 'flutter';
+
 /**
- * Inside the Flutter app DeepL never worked (it needs a Readest login):
- * settings still on it move to Google, and the untouched "EN" target of the
- * old default follows the app language instead.
+ * Inside the Flutter app DeepL never worked (it needs a Readest login) and
+ * the WebView's direct Google calls get rate-limited: settings on any other
+ * provider move to the app's own translator, and the untouched "EN" target
+ * of the old DeepL default follows the app language instead.
  */
 export function migrateEmbeddedTranslator(settings: SystemSettings): void {
   const read = settings.globalReadSettings;
-  if (read.translationProvider === 'deepl') {
-    read.translationProvider = 'google';
-    if (read.translateTargetLang === 'EN') read.translateTargetLang = '';
+  if (read.translationProvider === 'deepl' && read.translateTargetLang === 'EN') {
+    read.translateTargetLang = '';
   }
-  if (settings.globalViewSettings.translationProvider === 'deepl') {
-    settings.globalViewSettings.translationProvider = 'google';
+  if (read.translationProvider !== EMBEDDED_TRANSLATOR) {
+    read.translationProvider = EMBEDDED_TRANSLATOR;
+  }
+  if (settings.globalViewSettings.translationProvider !== EMBEDDED_TRANSLATOR) {
+    settings.globalViewSettings.translationProvider = EMBEDDED_TRANSLATOR;
   }
 }
 

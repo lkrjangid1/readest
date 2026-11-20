@@ -253,7 +253,7 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   isNotebookPinned: false,
   notebookActiveTab: 'notes',
   autohideCursor: true,
-  translationProvider: IS_FLUTTER_BUILD ? 'google' : 'deepl',
+  translationProvider: IS_FLUTTER_BUILD ? 'flutter' : 'deepl',
   translateTargetLang: IS_FLUTTER_BUILD ? '' : 'EN',
   wordLensAutoDownload: true,
 
@@ -433,7 +433,7 @@ export const DEFAULT_TTS_CONFIG: TTSConfig = {
 
 export const DEFAULT_TRANSLATOR_CONFIG: TranslatorConfig = {
   translationEnabled: false,
-  translationProvider: IS_FLUTTER_BUILD ? 'google' : 'deepl',
+  translationProvider: IS_FLUTTER_BUILD ? 'flutter' : 'deepl',
   translateTargetLang: '',
   showTranslateSource: true,
   ttsReadAloudText: 'both',

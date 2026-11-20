@@ -108,6 +108,9 @@ const createTTSNodeFilter = () =>
 // stop/init overhead allows, which reads as no pause at all.
 export const DEFAULT_PARAGRAPH_GAP_SEC = 0.3;
 
+/** Thrown by init() in the Flutter app when the phone has no usable engine. */
+export const FLUTTER_TTS_UNAVAILABLE = 'flutter-tts-unavailable';
+
 export class TTSController extends EventTarget {
   appService: AppService | null = null;
   view: FoliateView;
@@ -355,11 +358,19 @@ export class TTSController extends EventTarget {
   }
 
   async init() {
-    const availableClients = [];
-    if (this.#prefersNative && (await this.ttsNativeClient!.init())) {
-      availableClients.push(this.ttsNativeClient!);
+    if (this.#prefersNative) {
+      // Inside the Flutter app only the phone's engine can speak: the Edge
+      // service refuses the WebView's origin (HTTP 403) and the Android
+      // WebView has no Web Speech. Falling back to either left read-aloud
+      // "playing" in silence, so a missing engine is an error instead.
+      if (!(await this.ttsNativeClient!.init())) {
+        throw new Error(FLUTTER_TTS_UNAVAILABLE);
+      }
+      this.ttsClient = this.ttsNativeClient!;
       this.ttsNativeVoices = await this.ttsNativeClient!.getAllVoices();
+      return;
     }
+    const availableClients = [];
     if (await this.ttsEdgeClient.init()) {
       availableClients.push(this.ttsEdgeClient);
     }
@@ -1163,6 +1174,7 @@ export class TTSController extends EventTarget {
   }
 
   async getVoices(lang: string) {
+    if (this.#prefersNative) return (await this.ttsNativeClient!.getVoices(lang)) ?? [];
     const ttsWebVoices = await this.ttsWebClient.getVoices(lang);
     const ttsEdgeVoices = await this.ttsEdgeClient.getVoices(lang);
     const ttsNativeVoices = (await this.ttsNativeClient?.getVoices(lang)) ?? [];
@@ -1179,7 +1191,8 @@ export class TTSController extends EventTarget {
     const useNativeTTS = !!this.ttsNativeVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
     );
-    if (useNativeTTS && this.#prefersNative) {
+    if (this.#prefersNative) {
+      // The phone's engine is the only one that works in the Flutter app.
       this.ttsClient = this.ttsNativeClient!;
       await this.ttsClient.setRate(this.ttsRate);
     } else if (useEdgeTTS) {

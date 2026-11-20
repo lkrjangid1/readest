@@ -405,14 +405,15 @@ describe('provider registry inside the Flutter app', () => {
     vi.unstubAllEnvs();
   });
 
-  it('lists only keyless providers and resolves DeepL to Google', async () => {
+  it('lists only the app translator and resolves older choices to it', async () => {
     vi.stubEnv('NEXT_PUBLIC_APP_PLATFORM', 'flutter');
     const { getTranslators, getTranslator, resolveTranslatorName } = await import(
       '@/services/translators/providers'
     );
-    expect(getTranslators().map((t) => t.name)).toEqual(['google']);
+    expect(getTranslators().map((t) => t.name)).toEqual(['flutter']);
     expect(getTranslator('deepl')).toBeUndefined();
-    expect(resolveTranslatorName('deepl', false)).toBe('google');
+    expect(resolveTranslatorName('deepl', false)).toBe('flutter');
+    expect(resolveTranslatorName('google', false)).toBe('flutter');
   });
 
   it('keeps every provider elsewhere', async () => {
@@ -421,6 +422,7 @@ describe('provider registry inside the Flutter app', () => {
       '@/services/translators/providers'
     );
     expect(getTranslators().map((t) => t.name)).toContain('deepl');
+    expect(getTranslators().map((t) => t.name)).not.toContain('flutter');
     expect(resolveTranslatorName('deepl', true)).toBe('deepl');
     expect(resolveTranslatorName('deepl', false)).toBe('azure');
   });

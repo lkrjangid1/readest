@@ -16,7 +16,7 @@ import {
   TTSVoicesGroup,
 } from '@/services/tts';
 import { DEFAULT_SENTENCE_GAP_SEC } from '@/services/tts/EdgeTTSClient';
-import { DEFAULT_PARAGRAPH_GAP_SEC } from '@/services/tts/TTSController';
+import { DEFAULT_PARAGRAPH_GAP_SEC, FLUTTER_TTS_UNAVAILABLE } from '@/services/tts/TTSController';
 import { eventDispatcher } from '@/utils/event';
 import { genSSMLRaw, parseSSMLLang } from '@/utils/ssml';
 import { throttle } from '@/utils/throttle';
@@ -821,10 +821,13 @@ export const useTTSControl = ({ bookKey, onRequestHidePanel }: UseTTSControlProp
       } catch (error) {
         setShowIndicator(false);
         setIsPlaying(false);
-        eventDispatcher.dispatch('toast', {
-          message: _('TTS not supported for this document'),
-          type: 'error',
-        });
+        // The Flutter app explains a missing phone engine itself.
+        if (!(error instanceof Error && error.message === FLUTTER_TTS_UNAVAILABLE)) {
+          eventDispatcher.dispatch('toast', {
+            message: _('TTS not supported for this document'),
+            type: 'error',
+          });
+        }
         console.error(error);
       }
     } finally {
