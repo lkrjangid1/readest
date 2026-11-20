@@ -123,6 +123,24 @@ describe('googleProvider', () => {
     expect(result).toEqual(['Hello']);
   });
 
+  it('falls back to the dictionary endpoint when gtx is rate-limited', async () => {
+    mockFetch
+      .mockResolvedValueOnce({ ok: false, status: 429 })
+      .mockResolvedValueOnce({ ok: true, json: async () => [['Bonjour', 'en']] });
+
+    const { googleProvider } = await import('@/services/translators/providers/google');
+    const result = await googleProvider.translate(['Hello'], 'auto', 'fr');
+    expect(result).toEqual(['Bonjour']);
+    expect(String(mockFetch.mock.calls[1]![0])).toContain('clients5.google.com/translate_a/t');
+  });
+
+  it('parses both dictionary endpoint shapes', async () => {
+    const { parseDictExtResponse } = await import('@/services/translators/providers/google');
+    expect(parseDictExtResponse(['Hola'])).toBe('Hola');
+    expect(parseDictExtResponse([['Hola', 'en']])).toBe('Hola');
+    expect(parseDictExtResponse({})).toBeNull();
+  });
+
   it('has correct provider metadata', async () => {
     const { googleProvider } = await import('@/services/translators/providers/google');
     expect(googleProvider.name).toBe('google');
@@ -379,5 +397,31 @@ describe('provider registry disabled handling', () => {
     );
     const google = getTranslator('google')!;
     expect(getTranslatorDisplayLabel(google, true, (s) => s)).toBe('Google Translate');
+  });
+});
+
+describe('provider registry inside the Flutter app', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('lists only keyless providers and resolves DeepL to Google', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_PLATFORM', 'flutter');
+    const { getTranslators, getTranslator, resolveTranslatorName } = await import(
+      '@/services/translators/providers'
+    );
+    expect(getTranslators().map((t) => t.name)).toEqual(['google']);
+    expect(getTranslator('deepl')).toBeUndefined();
+    expect(resolveTranslatorName('deepl', false)).toBe('google');
+  });
+
+  it('keeps every provider elsewhere', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_PLATFORM', 'web');
+    const { getTranslators, resolveTranslatorName } = await import(
+      '@/services/translators/providers'
+    );
+    expect(getTranslators().map((t) => t.name)).toContain('deepl');
+    expect(resolveTranslatorName('deepl', true)).toBe('deepl');
+    expect(resolveTranslatorName('deepl', false)).toBe('azure');
   });
 });

@@ -5,6 +5,7 @@ import {
   getTranslator,
   getTranslators,
   isTranslatorAvailable,
+  resolveTranslatorName,
   TranslatorName,
 } from '@/services/translators';
 import { getFromCache, storeInCache, UseTranslatorOptions } from '@/services/translators';
@@ -23,8 +24,12 @@ export function useTranslator({
   const _ = useTranslation();
   const { token } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState(provider);
-  const [translator, setTransltor] = useState(() => getTranslator(provider));
+  // Start on a usable provider so the first call doesn't hit one that
+  // needs a login or isn't listed in this build (e.g. DeepL in the app).
+  const [selectedProvider, setSelectedProvider] = useState<TranslatorName>(
+    () => resolveTranslatorName(provider, !!token) ?? provider,
+  );
+  const [translator, setTransltor] = useState(() => getTranslator(selectedProvider));
   const [translators] = useState(() => getTranslators());
 
   useEffect(() => {

@@ -27,6 +27,23 @@ import {
 import { DEFAULT_AI_SETTINGS } from './ai/constants';
 import { getTargetLang, isCJKEnv } from '@/utils/misc';
 import { safeLoadJSON, safeSaveJSON } from './persistence';
+import { isFlutterHost } from '@/utils/flutterHost';
+
+/**
+ * Inside the Flutter app DeepL never worked (it needs a Readest login):
+ * settings still on it move to Google, and the untouched "EN" target of the
+ * old default follows the app language instead.
+ */
+export function migrateEmbeddedTranslator(settings: SystemSettings): void {
+  const read = settings.globalReadSettings;
+  if (read.translationProvider === 'deepl') {
+    read.translationProvider = 'google';
+    if (read.translateTargetLang === 'EN') read.translateTargetLang = '';
+  }
+  if (settings.globalViewSettings.translationProvider === 'deepl') {
+    settings.globalViewSettings.translationProvider = 'google';
+  }
+}
 
 export interface Context {
   fs: FileSystem;
@@ -149,6 +166,8 @@ export async function loadSettings(ctx: Context): Promise<SystemSettings> {
   };
 
   settings.localBooksDir = await ctx.fs.getPrefix('Books');
+
+  if (isFlutterHost()) migrateEmbeddedTranslator(settings);
 
   // Coerce stale `'wikipedia'` quick-action to `'dictionary'`. The Wikipedia
   // annotation tool was removed; Wikipedia is now reachable as a tab inside

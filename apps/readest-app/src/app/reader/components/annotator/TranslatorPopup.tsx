@@ -13,6 +13,7 @@ import {
   isTranslatorAvailable,
 } from '@/services/translators';
 import Select from '@/components/Select';
+import { isFlutterHost } from '@/utils/flutterHost';
 
 const notSupportedLangs = [''];
 
@@ -119,7 +120,8 @@ const TranslatorPopup: React.FC<TranslatorPopupProps> = ({
         }
       } catch (err) {
         console.error(err);
-        if (!token) {
+        // No accounts in the Flutter app: a login hint would be a dead end.
+        if (!token && !isFlutterHost()) {
           setError(_('Unable to fetch the translation. Please log in first and try again.'));
         } else {
           setError(_('Unable to fetch the translation. Try again later.'));
@@ -210,16 +212,18 @@ const TranslatorPopup: React.FC<TranslatorPopupProps> = ({
                 provider: providers.find((p) => p.name === provider)?.label,
               })}
           </div>
-          <Select
-            className='not-eink:bg-gray-600 not-eink:text-white eink:bg-base-100'
-            value={provider}
-            onChange={handleProviderChange}
-            options={providers.map(({ name: value, label, disabled }) => ({
-              value,
-              label,
-              disabled,
-            }))}
-          />
+          {providers.length > 1 && (
+            <Select
+              className='not-eink:bg-gray-600 not-eink:text-white eink:bg-base-100'
+              value={provider}
+              onChange={handleProviderChange}
+              options={providers.map(({ name: value, label, disabled }) => ({
+                value,
+                label,
+                disabled,
+              }))}
+            />
+          )}
         </div>
       </Popup>
     </div>

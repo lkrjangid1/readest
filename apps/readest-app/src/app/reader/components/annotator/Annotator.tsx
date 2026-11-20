@@ -1335,12 +1335,14 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
     }
     setShowAnnotPopup(false);
     setShowDictionaryPopup(true);
+    callFlutter('onReaderLookup', { kind: 'dictionary' });
   };
 
   const handleTranslation = () => {
     if (!selection || !selection.text) return;
     setShowAnnotPopup(false);
     setShowDeepLPopup(true);
+    callFlutter('onReaderLookup', { kind: 'translate' });
   };
 
   const handleSpeakText = async (oneTime = false) => {

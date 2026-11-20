@@ -1,3 +1,4 @@
+import { isFlutterHost } from '@/utils/flutterHost';
 import { TranslationProvider } from '../types';
 import { deeplProvider } from './deepl';
 import { azureProvider } from './azure';
@@ -31,12 +32,33 @@ const availableTranslators = [
 
 export type TranslatorName = (typeof availableTranslators)[number]['name'];
 
+/**
+ * Providers offered inside the Flutter app: no Readest account there (DeepL
+ * needs one) and the Edge token endpoint Azure relies on is gone, so only
+ * the keyless Google endpoint is listed.
+ */
+export const EMBEDDED_TRANSLATORS: TranslatorName[] = ['google'];
+
+const listedTranslators = () =>
+  isFlutterHost()
+    ? availableTranslators.filter((t) => EMBEDDED_TRANSLATORS.includes(t.name))
+    : availableTranslators;
+
 export const getTranslator = (name: TranslatorName): TranslationProvider | undefined => {
-  return availableTranslators.find((translator) => translator.name === name);
+  return listedTranslators().find((translator) => translator.name === name);
 };
 
 export const getTranslators = (): TranslationProvider[] => {
-  return availableTranslators;
+  return listedTranslators();
+};
+
+/** The provider to use for [name]: itself when usable, else the first usable one. */
+export const resolveTranslatorName = (
+  name: string | undefined,
+  hasToken: boolean,
+): TranslatorName | undefined => {
+  const usable = getTranslators().filter((t) => isTranslatorAvailable(t, hasToken));
+  return (usable.find((t) => t.name === name) ?? usable[0])?.name as TranslatorName | undefined;
 };
 
 /**

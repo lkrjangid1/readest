@@ -242,6 +242,10 @@ export const READING_RULER_COLORS: Record<ReadingRulerColor, string> = {
   rose: '#fb7185',
 };
 
+// The Flutter app has no Readest account, so DeepL (login only) can't be the
+// default there; translate into the app's language unless the user picks one.
+const IS_FLUTTER_BUILD = process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'flutter';
+
 export const DEFAULT_READSETTINGS: ReadSettings = {
   sideBarWidth: '15%',
   isSideBarPinned: true,
@@ -249,8 +253,8 @@ export const DEFAULT_READSETTINGS: ReadSettings = {
   isNotebookPinned: false,
   notebookActiveTab: 'notes',
   autohideCursor: true,
-  translationProvider: 'deepl',
-  translateTargetLang: 'EN',
+  translationProvider: IS_FLUTTER_BUILD ? 'google' : 'deepl',
+  translateTargetLang: IS_FLUTTER_BUILD ? '' : 'EN',
   wordLensAutoDownload: true,
 
   customThemes: [],
@@ -429,7 +433,7 @@ export const DEFAULT_TTS_CONFIG: TTSConfig = {
 
 export const DEFAULT_TRANSLATOR_CONFIG: TranslatorConfig = {
   translationEnabled: false,
-  translationProvider: 'deepl',
+  translationProvider: IS_FLUTTER_BUILD ? 'google' : 'deepl',
   translateTargetLang: '',
   showTranslateSource: true,
   ttsReadAloudText: 'both',
