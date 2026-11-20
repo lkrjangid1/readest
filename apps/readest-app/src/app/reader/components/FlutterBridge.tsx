@@ -12,6 +12,7 @@ import { useNotebookStore } from '@/store/notebookStore';
 import { eventDispatcher } from '@/utils/event';
 import { SERIF_FONTS, SANS_SERIF_FONTS, NON_FREE_FONTS } from '@/services/constants';
 import type { TOCItem } from '@/libs/document';
+import { findTocItemBS } from '@/services/nav';
 import { forgetFlutterSection, getSectionSample } from '@/utils/flutterSectionNotifier';
 
 const MAX_MARGIN_PX = 88;
@@ -339,6 +340,8 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
           sansSerifFont: vs?.sansSerifFont ?? '',
           serifFonts: SERIF_FONTS.filter(freeFont),
           sansSerifFonts: SANS_SERIF_FONTS.filter(freeFont),
+          bookTitle: useBookDataStore.getState().getBookData(bookKey)?.book?.title ?? '',
+          author: useBookDataStore.getState().getBookData(bookKey)?.book?.author ?? '',
         };
       },
 
@@ -351,8 +354,16 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
       getSectionSample: () =>
         getSectionSample(bookKey, useBookDataStore.getState().getBookData(bookKey)),
 
-      getBooknotes: () =>
-        (useBookDataStore.getState().getConfig(bookKey)?.booknotes ?? [])
+      getBooknotes: () => {
+        const toc = useBookDataStore.getState().getBookData(bookKey)?.bookDoc?.toc ?? [];
+        const chapterOf = (cfi: string) => {
+          try {
+            return (findTocItemBS(toc, cfi)?.label ?? '').trim();
+          } catch {
+            return '';
+          }
+        };
+        return (useBookDataStore.getState().getConfig(bookKey)?.booknotes ?? [])
           .filter((n) => !n.deletedAt && n.cfi)
           .map((n) => ({
             id: n.id,
@@ -361,8 +372,13 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
             text: n.text ?? '',
             note: n.note ?? '',
             color: n.color ?? null,
+            style: n.style ?? null,
+            page: n.page ?? null,
+            chapter: chapterOf(n.cfi),
             createdAt: n.createdAt,
-          })),
+            updatedAt: n.updatedAt,
+          }));
+      },
     };
 
     window.__readestFlutterBridge = bridge;

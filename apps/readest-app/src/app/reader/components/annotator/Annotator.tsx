@@ -52,6 +52,7 @@ import { getIndexFromCfi } from '@/utils/cfi';
 import { writeTextToClipboard } from '@/utils/clipboard';
 import { canShareText, shareSelectedText } from '@/utils/share';
 import { getToolbarToolTypes } from '@/utils/annotationToolbar';
+import { callFlutter, isFlutterHost } from '@/utils/flutterHost';
 import { AnnotationToolType } from '@/types/annotator';
 import { TransformContext } from '@/services/transformers/types';
 import { transformContent } from '@/services/transformService';
@@ -203,7 +204,11 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
   const transPopupHeight = Math.min(265, maxHeight);
   const proofreadPopupWidth = Math.min(440, maxWidth);
   const proofreadPopupHeight = Math.min(200, maxHeight);
-  const canShare = canShareText(appService);
+  // Inside the Flutter app the native share sheet and the quote image
+  // come from Flutter (the WebView has no navigator.share).
+  const inFlutter = isFlutterHost();
+  const canShare = canShareText(appService) || inFlutter;
+  const canQuote = inFlutter;
   // The toolbar is now customizable, so size the selection popup to the number
   // of visible tools (responsive) up to a max — otherwise a 2-tool toolbar
   // renders a sparse, full-width bar. Annotated selections keep the max width
@@ -213,6 +218,7 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
   const visibleToolCount = getToolbarToolTypes(
     viewSettings.annotationToolbarItems,
     canShare,
+    canQuote,
   ).length;
   const annotPopupWidth = selection?.annotated
     ? annotPopupMaxWidth
@@ -377,6 +383,10 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
     // Bound to the section so a selectionchange deferred during the drag can
     // be processed (and the popup shown once) when the gesture ends.
     detail.doc?.addEventListener('touchend', handleTouchEnd.bind(null, doc, index));
+    // A long-press that starts a native selection ends in touchcancel, not
+    // touchend, in Android WebViews (contextmenu takes the gesture): without
+    // this the deferred selection was never processed and no toolbar showed.
+    detail.doc?.addEventListener('touchcancel', handleTouchEnd.bind(null, doc, index));
     // Re-arm the instant quick action at the start of each gesture. Android does
     // this via the native-touch touchstart above; iOS/desktop have no such path,
     // and a single iOS long-press emits multiple selectionchange events for the
@@ -1098,8 +1108,37 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
     }
   };
 
+  /** Where the selection is, for the Flutter quote image and share text. */
+  const selectionContext = () => {
+    const cfi = selection ? view?.getCFI(selection.index, selection.range) : undefined;
+    let chapter = '';
+    try {
+      if (cfi) chapter = (findTocItemBS(bookData.bookDoc?.toc ?? [], cfi)?.label ?? '').trim();
+    } catch {
+      // No chapter label: the card goes without it.
+    }
+    return {
+      text: selection?.text ?? '',
+      cfi: cfi ?? '',
+      chapter,
+      bookTitle: bookData.book?.title ?? '',
+      author: bookData.book?.author ?? '',
+    };
+  };
+
+  const handleQuote = () => {
+    if (!selection?.text) return;
+    callFlutter('onQuoteSelection', selectionContext());
+    handleDismissPopupAndSelection();
+  };
+
   const handleShare = () => {
     if (!selection?.text) return;
+    if (inFlutter) {
+      callFlutter('onShareSelection', selectionContext());
+      handleDismissPopupAndSelection();
+      return;
+    }
     const position = trianglePosition
       ? {
           x: trianglePosition.point.x,
@@ -1686,12 +1725,14 @@ const Annotator: React.FC<{ bookKey: string; contentInsets: Insets }> = ({
         };
       case 'share':
         return { tooltipText: _(label), Icon, onClick: handleShare };
+      case 'quote':
+        return { tooltipText: _(label), Icon, onClick: handleQuote };
       default:
         return null;
     }
   };
 
-  const toolButtons = getToolbarToolTypes(viewSettings.annotationToolbarItems, canShare)
+  const toolButtons = getToolbarToolTypes(viewSettings.annotationToolbarItems, canShare, canQuote)
     .map(buildToolButton)
     .filter((button): button is NonNullable<typeof button> => button !== null);
 

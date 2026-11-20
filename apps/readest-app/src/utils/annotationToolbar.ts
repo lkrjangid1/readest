@@ -12,11 +12,12 @@ export const ALL_ANNOTATION_TOOL_TYPES: AnnotationToolType[] = [
   'tts',
   'proofread',
   'share',
+  'quote',
 ];
 
-// Default toolbar: the eight pre-existing tools in their original order.
-// 'share' starts hidden in the Available tray per the #4014 design.
-export const DEFAULT_ANNOTATION_TOOLBAR_ITEMS: AnnotationToolType[] = [
+// The default toolbar before 'quote' existed: a saved list equal to it was
+// never customised, so it follows the current default.
+const LEGACY_DEFAULT_TOOLBAR_ITEMS: AnnotationToolType[] = [
   'copy',
   'highlight',
   'annotate',
@@ -27,10 +28,29 @@ export const DEFAULT_ANNOTATION_TOOLBAR_ITEMS: AnnotationToolType[] = [
   'proofread',
 ];
 
+// Default toolbar: the pre-existing tools in their original order, with
+// 'quote' (Flutter only) next to highlight. 'share' starts hidden in the
+// Available tray per the #4014 design.
+export const DEFAULT_ANNOTATION_TOOLBAR_ITEMS: AnnotationToolType[] = [
+  'copy',
+  'highlight',
+  'quote',
+  'annotate',
+  'search',
+  'dictionary',
+  'translate',
+  'tts',
+  'proofread',
+];
+
 // Drop unknown/duplicate entries; fall back to the default when unset (a
 // pre-existing per-book config may not carry the field yet).
+const isLegacyDefault = (items: AnnotationToolType[]) =>
+  items.length === LEGACY_DEFAULT_TOOLBAR_ITEMS.length &&
+  items.every((type, i) => type === LEGACY_DEFAULT_TOOLBAR_ITEMS[i]);
+
 const sanitize = (items: AnnotationToolType[] | undefined): AnnotationToolType[] => {
-  const source = items ?? DEFAULT_ANNOTATION_TOOLBAR_ITEMS;
+  const source = !items || isLegacyDefault(items) ? DEFAULT_ANNOTATION_TOOLBAR_ITEMS : items;
   const seen = new Set<AnnotationToolType>();
   const out: AnnotationToolType[] = [];
   for (const type of source) {
@@ -42,22 +62,38 @@ const sanitize = (items: AnnotationToolType[] | undefined): AnnotationToolType[]
   return out;
 };
 
+// Whether a tool can work here: 'share' needs a share sheet, 'quote' the
+// Flutter app.
+export const isToolSupported = (
+  type: AnnotationToolType,
+  canShare: boolean,
+  canQuote = false,
+): boolean => (type !== 'share' || canShare) && (type !== 'quote' || canQuote);
+
 // Visible tools to render in the live selection toolbar, in order.
 export const getToolbarToolTypes = (
   items: AnnotationToolType[] | undefined,
   canShare: boolean,
-): AnnotationToolType[] => sanitize(items).filter((type) => canShare || type !== 'share');
+  canQuote = false,
+): AnnotationToolType[] =>
+  sanitize(items).filter((type) => isToolSupported(type, canShare, canQuote));
 
 // Hidden tools (the "Available" tray), in canonical order.
 export const getAvailableToolTypes = (
   items: AnnotationToolType[] | undefined,
   canShare: boolean,
+  canQuote = false,
 ): AnnotationToolType[] => {
   const visible = new Set(sanitize(items));
   return ALL_ANNOTATION_TOOL_TYPES.filter(
-    (type) => !visible.has(type) && (canShare || type !== 'share'),
+    (type) => !visible.has(type) && isToolSupported(type, canShare, canQuote),
   );
 };
+
+// The saved list (sanitised) including tools this platform hides, so an
+// edit here doesn't drop a tool another device shows.
+export const getSavedToolTypes = (items: AnnotationToolType[] | undefined): AnnotationToolType[] =>
+  sanitize(items);
 
 // Add `type` to the visible list at `atIndex` (default: end). No-op if present.
 export const addToolToToolbar = (

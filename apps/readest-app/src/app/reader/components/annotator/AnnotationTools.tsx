@@ -8,6 +8,7 @@ import { BsPencilSquare } from 'react-icons/bs';
 import { BsTranslate } from 'react-icons/bs';
 import { FaHeadphones } from 'react-icons/fa6';
 import { IoIosBuild } from 'react-icons/io';
+import { RiDoubleQuotesL } from 'react-icons/ri';
 import { AnnotationToolType } from '@/types/annotator';
 import { stubTranslation as _ } from '@/utils/misc';
 
@@ -96,6 +97,13 @@ export const annotationToolButtons = createAnnotationToolButtons([
     tooltip: _('Share text after selection'),
     Icon: FiShare,
     quickAction: true,
+  },
+  {
+    // Flutter app only: a shareable image of the selected text.
+    type: 'quote',
+    label: _('Quote image'),
+    tooltip: _('Make a shareable image of the selected text'),
+    Icon: RiDoubleQuotesL,
   },
 ]);
 

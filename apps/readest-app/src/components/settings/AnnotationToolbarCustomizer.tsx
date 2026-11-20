@@ -28,12 +28,15 @@ import { annotationToolButtons } from '@/app/reader/components/annotator/Annotat
 import {
   ALL_ANNOTATION_TOOL_TYPES,
   getAvailableToolTypes,
+  getSavedToolTypes,
   getToolbarToolTypes,
+  isToolSupported,
   addToolToToolbar,
   removeToolFromToolbar,
   reorderToolbar,
 } from '@/utils/annotationToolbar';
 import { canShareText } from '@/utils/share';
+import { isFlutterHost } from '@/utils/flutterHost';
 import SubPageHeader from './SubPageHeader';
 
 type ZoneId = 'toolbar' | 'available';
@@ -151,20 +154,20 @@ const AnnotationToolbarCustomizer: React.FC<AnnotationToolbarCustomizerProps> = 
   const { settings } = useSettingsStore();
   const viewSettings = getViewSettings(bookKey) || settings.globalViewSettings;
 
-  const canShare = canShareText(appService);
+  const canShare = canShareText(appService) || isFlutterHost();
+  const canQuote = isFlutterHost();
 
-  // `share` is hidden on platforms that can't share (Windows/Linux desktop).
-  // If the user enabled it on a share-capable device (e.g. their phone) and it
-  // synced here, we must not drop it just because the user edits the toolbar on
-  // this device — preserve it across persists so the capable device keeps it.
-  const savedHasShare = getToolbarToolTypes(viewSettings.annotationToolbarItems, true).includes(
-    'share',
+  // `share` is hidden on platforms that can't share (Windows/Linux desktop),
+  // `quote` outside the Flutter app. If the user enabled one on a device that
+  // has it and it synced here, we must not drop it just because the user edits
+  // the toolbar on this device — preserve it across persists.
+  const hiddenSaved = getSavedToolTypes(viewSettings.annotationToolbarItems).filter(
+    (type) => !isToolSupported(type, canShare, canQuote),
   );
-  const preserveHiddenShare = !canShare && savedHasShare;
 
   const [items, setItems] = useState<Record<ZoneId, AnnotationToolType[]>>(() => ({
-    toolbar: getToolbarToolTypes(viewSettings.annotationToolbarItems, canShare),
-    available: getAvailableToolTypes(viewSettings.annotationToolbarItems, canShare),
+    toolbar: getToolbarToolTypes(viewSettings.annotationToolbarItems, canShare, canQuote),
+    available: getAvailableToolTypes(viewSettings.annotationToolbarItems, canShare, canQuote),
   }));
   // dnd-kit invokes onDragEnd with the handler captured at drag start, so the
   // closed-over `items` is stale by the time a cross-zone drag finishes. Read
@@ -207,17 +210,14 @@ const AnnotationToolbarCustomizer: React.FC<AnnotationToolbarCustomizerProps> = 
   );
 
   const persist = (toolbar: AnnotationToolType[]) => {
-    const toSave =
-      preserveHiddenShare && !toolbar.includes('share')
-        ? [...toolbar, 'share' as AnnotationToolType]
-        : toolbar;
+    const toSave = [...toolbar, ...hiddenSaved.filter((type) => !toolbar.includes(type))];
     saveViewSettings(envConfig, bookKey, 'annotationToolbarItems', toSave, false, true);
   };
 
   // Commit a new toolbar order: keep the user's arrangement, recompute the
   // available tray as its canonical-order complement, and persist.
   const commit = (toolbar: AnnotationToolType[]) => {
-    setItems({ toolbar, available: getAvailableToolTypes(toolbar, canShare) });
+    setItems({ toolbar, available: getAvailableToolTypes(toolbar, canShare, canQuote) });
     persist(toolbar);
   };
 
@@ -235,7 +235,8 @@ const AnnotationToolbarCustomizer: React.FC<AnnotationToolbarCustomizerProps> = 
 
   // "Add all" rebuilds the toolbar in the canonical predefined order (not the
   // user's prior arrangement); "Clear all" empties it.
-  const addAll = () => commit(ALL_ANNOTATION_TOOL_TYPES.filter((t) => canShare || t !== 'share'));
+  const addAll = () =>
+    commit(ALL_ANNOTATION_TOOL_TYPES.filter((t) => isToolSupported(t, canShare, canQuote)));
   const clearAll = () => commit([]);
 
   const handleDragStart = () => {

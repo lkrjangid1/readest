@@ -15,10 +15,11 @@ describe('annotationToolbar helpers', () => {
     expect(ALL_ANNOTATION_TOOL_TYPES).toEqual(annotationToolButtons.map((b) => b.type));
   });
 
-  test('default toolbar is the eight non-share tools in canonical order', () => {
+  test('default toolbar is the non-share tools, quote next to highlight', () => {
     expect(DEFAULT_ANNOTATION_TOOLBAR_ITEMS).toEqual([
       'copy',
       'highlight',
+      'quote',
       'annotate',
       'search',
       'dictionary',
@@ -30,13 +31,36 @@ describe('annotationToolbar helpers', () => {
   });
 
   test('getToolbarToolTypes preserves order and falls back to default when undefined', () => {
-    expect(getToolbarToolTypes(undefined, true)).toEqual(DEFAULT_ANNOTATION_TOOLBAR_ITEMS);
+    expect(getToolbarToolTypes(undefined, true, true)).toEqual(DEFAULT_ANNOTATION_TOOLBAR_ITEMS);
     expect(getToolbarToolTypes(['search', 'copy'], true)).toEqual(['search', 'copy']);
   });
 
   test('getToolbarToolTypes drops share when !canShare, keeps it when canShare', () => {
     expect(getToolbarToolTypes(['copy', 'share'], false)).toEqual(['copy']);
     expect(getToolbarToolTypes(['copy', 'share'], true)).toEqual(['copy', 'share']);
+  });
+
+  test('quote shows only where it works (the Flutter app)', () => {
+    expect(getToolbarToolTypes(['copy', 'quote'], true)).toEqual(['copy']);
+    expect(getToolbarToolTypes(['copy', 'quote'], true, true)).toEqual(['copy', 'quote']);
+    expect(getAvailableToolTypes(['copy'], true)).not.toContain('quote');
+    expect(getAvailableToolTypes(['copy'], true, true)).toContain('quote');
+  });
+
+  test('a saved list equal to the old default follows the new default', () => {
+    const legacy = [
+      'copy',
+      'highlight',
+      'annotate',
+      'search',
+      'dictionary',
+      'translate',
+      'tts',
+      'proofread',
+    ] as const;
+    expect(getToolbarToolTypes([...legacy], true, true)).toEqual(DEFAULT_ANNOTATION_TOOLBAR_ITEMS);
+    // A customised list is kept as is.
+    expect(getToolbarToolTypes(['copy', 'highlight'], true, true)).toEqual(['copy', 'highlight']);
   });
 
   test('getToolbarToolTypes drops unknown/duplicate entries', () => {
@@ -53,6 +77,17 @@ describe('annotationToolbar helpers', () => {
       'tts',
       'proofread',
       'share',
+    ]);
+    expect(getAvailableToolTypes(['copy'], true, true)).toEqual([
+      'highlight',
+      'annotate',
+      'search',
+      'dictionary',
+      'translate',
+      'tts',
+      'proofread',
+      'share',
+      'quote',
     ]);
   });
 
