@@ -128,6 +128,12 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
         eventDispatcher.dispatch('tts-toggle-play', { bookKey });
         return true;
       },
+      // Read-aloud off (e.g. the free daily minutes ran out); no-op when off.
+      ttsStop: () => {
+        if (!reader().getViewState(bookKey)?.ttsEnabled) return false;
+        eventDispatcher.dispatch('tts-stop', { bookKey });
+        return true;
+      },
       settings: (panel) => {
         const st = useSettingsStore.getState();
         st.setRequestedPanel(typeof panel === 'string' ? panel : null);

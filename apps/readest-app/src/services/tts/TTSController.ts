@@ -12,6 +12,8 @@ import {
 import { createRejectFilter } from '@/utils/node';
 import { WebSpeechClient } from './WebSpeechClient';
 import { NativeTTSClient } from './NativeTTSClient';
+import { FlutterTTSClient } from './FlutterTTSClient';
+import { isFlutterHost } from '@/utils/flutterHost';
 import { EdgeTTSClient } from './EdgeTTSClient';
 import { SectionTimeline, TimelineSentence } from './SectionTimeline';
 import { hydrateProvisionalDurations } from './ttsDuration';
@@ -190,8 +192,11 @@ export class TTSController extends EventTarget {
     this.ttsWebClient = new WebSpeechClient(this);
     this.ttsEdgeClient = new EdgeTTSClient(this, appService);
     // Native TTS is backed by Android TextToSpeech and iOS AVSpeechSynthesizer.
+    // Inside the Flutter app it is the phone's engine through flutter_tts.
     // TODO: implement native TTS client for desktop platforms.
-    if (appService?.isAndroidApp || appService?.isIOSApp) {
+    if (isFlutterHost()) {
+      this.ttsNativeClient = new FlutterTTSClient(this);
+    } else if (appService?.isAndroidApp || appService?.isIOSApp) {
       this.ttsNativeClient = new NativeTTSClient(this);
     }
     this.ttsClient = this.ttsWebClient;
@@ -343,12 +348,22 @@ export class TTSController extends EventTarget {
     this.redispatchPosition();
   }
 
+  // The phone's own engine leads inside the Flutter app (works offline, no
+  // WebSocket); Edge stays available as an extra voice set.
+  get #prefersNative(): boolean {
+    return this.ttsNativeClient instanceof FlutterTTSClient;
+  }
+
   async init() {
     const availableClients = [];
+    if (this.#prefersNative && (await this.ttsNativeClient!.init())) {
+      availableClients.push(this.ttsNativeClient!);
+      this.ttsNativeVoices = await this.ttsNativeClient!.getAllVoices();
+    }
     if (await this.ttsEdgeClient.init()) {
       availableClients.push(this.ttsEdgeClient);
     }
-    if (this.ttsNativeClient && (await this.ttsNativeClient.init())) {
+    if (!this.#prefersNative && this.ttsNativeClient && (await this.ttsNativeClient.init())) {
       availableClients.push(this.ttsNativeClient);
       this.ttsNativeVoices = await this.ttsNativeClient.getAllVoices();
     }
@@ -1164,7 +1179,10 @@ export class TTSController extends EventTarget {
     const useNativeTTS = !!this.ttsNativeVoices.find(
       (voice) => (voiceId === '' || voice.id === voiceId) && !voice.disabled,
     );
-    if (useEdgeTTS) {
+    if (useNativeTTS && this.#prefersNative) {
+      this.ttsClient = this.ttsNativeClient!;
+      await this.ttsClient.setRate(this.ttsRate);
+    } else if (useEdgeTTS) {
       this.ttsClient = this.ttsEdgeClient;
       await this.ttsClient.setRate(this.ttsRate);
     } else if (useNativeTTS) {
