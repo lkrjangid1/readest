@@ -14,6 +14,7 @@ import { SERIF_FONTS, SANS_SERIF_FONTS, NON_FREE_FONTS } from '@/services/consta
 import type { TOCItem } from '@/libs/document';
 import { findTocItemBS } from '@/services/nav';
 import { forgetFlutterSection, getSectionSample } from '@/utils/flutterSectionNotifier';
+import { createTTSNodeFilter } from '@/services/tts/TTSController';
 
 const MAX_MARGIN_PX = 88;
 const MAX_GAP_PERCENT = 10;
@@ -45,7 +46,47 @@ type Bridge = {
   action: (name: string, arg?: unknown) => Promise<boolean>;
   /** A quote from the chapter just finished (see onSectionChange), or null. */
   getSectionSample: () => Promise<string | null>;
+  /** The sentences ahead, for Flutter to keep reading aloud on its own. */
+  getSpeechAhead: (opts?: SpeechAheadOptions) => Promise<SpeechAhead | null>;
 };
+
+/** Where `getSpeechAhead` starts: a section, and the sentence being spoken. */
+interface SpeechAheadOptions {
+  /** Section index; defaults to the one on screen. */
+  fromSection?: number;
+  /** The sentence read aloud last: speech resumes at it in that section. */
+  fromText?: string;
+  /** Skip this many sentences of the first section (continuing a batch). */
+  fromSentence?: number;
+  /** Stop after about this many characters (default 40 000, ~45 min). */
+  maxChars?: number;
+}
+
+interface SpeechAheadItem {
+  text: string;
+  section: number;
+  /** CFI of the sentence, to come back to it in the reader. */
+  cfi: string;
+  lang: string;
+  /** Chapter title (TOC label) the sentence is in. */
+  label: string;
+}
+
+interface SpeechAhead {
+  items: SpeechAheadItem[];
+  /** Last section included. */
+  lastSection: number;
+  /** Where the next batch starts (pass as fromSection / fromSentence). */
+  nextSection: number;
+  nextSentence: number;
+  /** True when the book has nothing after this batch. */
+  done: boolean;
+  bookTitle: string;
+  author: string;
+}
+
+const SPEAKABLE = (text: string) => text.length > 0 && !/^[\p{P}\p{S}]+$/u.test(text);
+const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 declare global {
   interface Window {
@@ -359,6 +400,132 @@ const FlutterBridge: React.FC<{ bookKey: string }> = ({ bookKey }) => {
 
       getSectionSample: () =>
         getSectionSample(bookKey, useBookDataStore.getState().getBookData(bookKey)),
+
+      // Background read-aloud: Flutter speaks these itself (no WebView needed),
+      // so it goes on after the reader closes or the app is in the background.
+      getSpeechAhead: async (opts) => {
+        const view = reader().getView(bookKey);
+        const bookData = useBookDataStore.getState().getBookData(bookKey);
+        const sections = view?.book?.sections;
+        if (!view || !sections?.length || bookData?.isFixedLayout) return null;
+        const maxChars = Math.max(2000, opts?.maxChars ?? 40000);
+        const start =
+          typeof opts?.fromSection === 'number'
+            ? opts.fromSection
+            : (view.renderer.primaryIndex ?? reader().getProgress(bookKey)?.index ?? 0);
+        const toc = bookData?.bookDoc?.toc ?? [];
+        const labelOf = (cfi: string) => {
+          try {
+            return cfi ? (findTocItemBS(toc, cfi)?.label ?? '').trim() : '';
+          } catch {
+            return '';
+          }
+        };
+        const meta = view.book.metadata as { language?: string | string[] } | undefined;
+        const bookLang = (Array.isArray(meta?.language) ? meta?.language[0] : meta?.language) || '';
+        const { getSentences } = await import('foliate-js/tts.js');
+        const { textWalker } = await import('foliate-js/text-walker.js');
+        const nodeFilter = createTTSNodeFilter();
+        const items: SpeechAheadItem[] = [];
+        let chars = 0;
+        let last = start - 1;
+        let next = { section: start, sentence: 0 };
+        const skip = Math.max(0, opts?.fromSentence ?? 0);
+        const from = skip ? '' : squash(opts?.fromText ?? '');
+        for (let i = Math.max(0, start); i < sections.length && chars < maxChars; i++) {
+          last = i;
+          const section = sections[i] as {
+            createDocument?: () => Promise<Document>;
+            linear?: string;
+          };
+          if (!section?.createDocument || section.linear === 'no') continue;
+          let doc: Document;
+          try {
+            doc = await section.createDocument();
+          } catch {
+            continue;
+          }
+          const html = doc.documentElement;
+          const lang = html?.getAttribute('lang') || html?.getAttribute('xml:lang') || bookLang;
+          // Streamed: a whole book can be one section, so stop as soon as
+          // enough text is collected instead of segmenting all of it first.
+          const probe = i === start && from ? from.slice(0, 60) : '';
+          let matched = !probe;
+          let label = '';
+          let sectionItems: SpeechAheadItem[] = [];
+          let sectionChars = 0;
+          // Without a match (the sentence isn't in this section), speech
+          // starts at the section's beginning: keep that batch meanwhile.
+          let fallback: SpeechAheadItem[] | null = probe ? [] : null;
+          let fallbackChars = 0;
+          const budget = maxChars - chars;
+          let n = 0; // speakable sentences seen in this section
+          let stoppedAt = -1;
+          let fallbackEnd = -1;
+          // CFIs only for every few sentences: they cost the most, and coming
+          // back to the nearest one is close enough.
+          let since = 0;
+          const toItem = (text: string, range: Range): SpeechAheadItem => {
+            let cfi = '';
+            if (since++ % 3 === 0) {
+              try {
+                cfi = view.getCFI(i, range);
+              } catch {
+                // A CFI only helps to come back; speech works without it.
+              }
+            }
+            // One file can hold several chapters: follow the TOC as it goes.
+            if (cfi) label = labelOf(cfi) || label;
+            return { text, section: i, cfi, lang, label };
+          };
+          for (const e of getSentences(doc, textWalker, nodeFilter, 'sentence')) {
+            const text = squash(e.range.toString());
+            if (!SPEAKABLE(text)) continue;
+            n++;
+            if (i === start && n <= skip) continue;
+            if (!matched) {
+              if (text.includes(probe) || from.includes(text)) {
+                matched = true;
+                fallback = null;
+                since = 0;
+                label = '';
+              } else {
+                if (fallback && fallbackChars < budget) {
+                  fallback.push(toItem(text, e.range));
+                  fallbackChars += text.length;
+                  if (fallbackChars >= budget) fallbackEnd = n;
+                }
+                continue;
+              }
+            }
+            sectionItems.push(toItem(text, e.range));
+            sectionChars += text.length;
+            if (sectionChars >= budget) {
+              stoppedAt = n;
+              break;
+            }
+          }
+          if (!matched && fallback) {
+            sectionItems = fallback;
+            sectionChars = fallbackChars;
+            stoppedAt = fallbackEnd;
+          }
+          items.push(...sectionItems);
+          chars += sectionChars;
+          next =
+            stoppedAt >= 0 ? { section: i, sentence: stoppedAt } : { section: i + 1, sentence: 0 };
+          if (stoppedAt >= 0) break;
+        }
+        return {
+          items,
+          lastSection: last,
+          nextSection: next.section,
+          nextSentence: next.sentence,
+          done: next.section >= sections.length,
+          bookTitle: bookData?.book?.title ?? '',
+          author: bookData?.book?.author ?? '',
+        };
+      },
 
       getBooknotes: () => {
         const toc = useBookDataStore.getState().getBookData(bookKey)?.bookDoc?.toc ?? [];

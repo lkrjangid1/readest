@@ -432,6 +432,11 @@ window.FlutterReaderAPI = {
     const b = this._bridge();
     return b && b.getSectionSample ? (await b.getSectionSample()) ?? null : null;
   },
+  // Sentences ahead for background read-aloud (Flutter speaks them itself).
+  async getSpeechAhead(opts) {
+    const b = this._bridge();
+    return b && b.getSpeechAhead ? (await b.getSpeechAhead(opts || {})) ?? null : null;
+  },
 
   // Close current book
   closeBook() {

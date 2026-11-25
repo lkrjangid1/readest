@@ -77,7 +77,7 @@ export interface TTSViewBindings {
 
 // Node filter shared by the live TTS instance and the timeline enumeration —
 // the two MUST segment identically or timeline sentences drift from marks.
-const createTTSNodeFilter = () =>
+export const createTTSNodeFilter = () =>
   createRejectFilter({
     tags: ['rt', 'canvas', 'br'],
     // Footnotes/endnotes are hidden in the rendered page (see the
